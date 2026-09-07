@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  <title>El Laburador</title>
+
+  <!-- p5.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+
+<body>
+
+  <div id="gameContainer">
+
+    <!-- =========================================================
+         CANVAS DEL JUEGO
+    ========================================================== -->
+    <div id="canvasWrapper"></div>
+
+    <!-- Grano de película sutil sobre el canvas: textura de ruido
+         animada por CSS puro, no consume nada del render 3D. -->
+    <div id="grano"></div>
+
+
+    <!-- =========================================================
+         PANTALLA DE INICIO / MANUAL
+    ========================================================== -->
+    <div id="pantallaInicio">
+
+      <div class="pi-caja">
+
+        <!-- Marca -->
+        <div class="pi-marca">
+          EL LABURADOR
+        </div>
+
+
+        <!-- Pestañas -->
+        <div class="pi-tabs">
+
+          <button
+            class="pi-tab activa"
+            onclick="mostrarTabInicio('historia', this)"
+          >
+            La historia
+          </button>
+
+          <button
+            class="pi-tab"
+            onclick="mostrarTabInicio('objetivo', this)"
+          >
+            Qué se aprende
+          </button>
+
+          <button
+            class="pi-tab"
+            onclick="mostrarTabInicio('como', this)"
+          >
+            Cómo se juega
+          </button>
+
+          <button
+            class="pi-tab"
+            onclick="mostrarTabInicio('controles', this)"
+          >
+            Controles
+          </button>
+
+        </div>
+
+
+        <!-- Contenido de las pestañas -->
+        <div class="pi-contenido">
+
+          <!-- ==================== HISTORIA ==================== -->
+          <div
+            class="pi-seccion activa"
+            id="pi-historia"
+          >
+
+            <p>
+              Tu hermano está preso esperando juicio. Podés sacarlo
+              pagando una fianza de <strong>$50.000</strong>, pero tenés
+              <strong>2 semanas</strong> antes de la audiencia.
+            </p>
+
+            <p>
+              Lo único que tenés es el kiosco del barrio. Comprás
+              mercadería, le ponés precio, atendés por la ventanita
+              y tratás de juntar la plata a tiempo.
+            </p>
+
+            <p>
+              Los gastos fijos (alquiler y luz) se cobran dos veces por
+              semana, tengas ventas o no. Y en el camino va a aparecer
+              gente ofreciéndote atajos. <strong>Ninguno es gratis.</strong>
+            </p>
+
+          </div>
+
+
+          <!-- ==================== OBJETIVO ==================== -->
+          <div
+            class="pi-seccion"
+            id="pi-objetivo"
+          >
+
+            <p>
+              El Laburador es un juego sobre
+              <strong>gestión de un presupuesto limitado</strong>.
+              Jugando vas a trabajar estos conceptos:
+            </p>
+
+            <ul>
+
+              <li>
+                <strong>Cálculo mental:</strong>
+                en cada venta sumás el total y calculás el vuelto
+                exacto vos mismo. El juego no lo hace por vos.
+              </li>
+
+              <li>
+                <strong>Relación precio–demanda:</strong>
+                si ponés el precio muy alto vendés menos; si lo ponés
+                muy bajo ganás poco margen. Hay un punto de equilibrio
+                que tenés que encontrar por tanteo.
+              </li>
+
+              <li>
+                <strong>Costo, margen y ganancia:</strong>
+                cada producto se compra a un precio y se vende a otro.
+                La diferencia es lo que te queda.
+              </li>
+
+              <li>
+                <strong>Capital de trabajo:</strong>
+                la plata que gastás en reponer stock es plata que
+                no va al objetivo.
+              </li>
+
+              <li>
+                <strong>Costos fijos:</strong>
+                alquiler y luz se pagan sí o sí. Si no llegás,
+                la deuda se acumula con recargo.
+              </li>
+
+            </ul>
+
+          </div>
+
+
+          <!-- ==================== CÓMO SE JUEGA ==================== -->
+          <div
+            class="pi-seccion"
+            id="pi-como"
+          >
+
+            <p>
+              El juego avanza por <strong>días</strong> y
+              <strong>semanas</strong>:
+            </p>
+
+            <ol>
+
+              <li>
+                Durante el día atendés clientes en la ventanita.
+              </li>
+
+              <li>
+                Cuando querés cerrar, caminás hasta la puerta de
+                <strong>SALIDA</strong> y pasás al día siguiente.
+                La semana tiene 6 días, de lunes a sábado.
+              </li>
+
+              <li>
+                Los gastos fijos (alquiler y luz) se cobran
+                <strong>dos veces por semana</strong>: la mitad el
+                miércoles y la otra mitad el sábado, que es el día en
+                que se hace el balance semanal.
+              </li>
+
+              <li>
+                En el panel de gestión comprás stock y le ponés
+                precio a cada producto.
+              </li>
+
+              <li>
+                Atendés hasta <strong>10 clientes por día</strong>: al
+                décimo, el kiosco cierra solo y pasa al día siguiente.
+                También podés cerrar antes vos mismo caminando hasta
+                la puerta de <strong>SALIDA</strong>.
+              </li>
+
+            </ol>
+
+
+            <!-- Aviso importante -->
+            <div class="pi-aviso">
+
+              <div class="pi-aviso-titulo">
+                IMPORTANTE: las cuentas las hacés vos
+              </div>
+
+              <p>
+                Cuando un cliente pide algo, el juego te muestra
+                <strong>qué lleva y a cuánto está cada cosa</strong>,
+                pero <strong>no te dice el total</strong>.
+              </p>
+
+              <p>
+                Vos tenés que sumar la compra, restarla al billete
+                con el que paga, y escribir el vuelto.
+              </p>
+
+              <p style="margin: 0;">
+                Si te equivocás <strong>de más</strong>, perdés esa plata.
+                Si te equivocás <strong>de menos</strong>, el cliente reclama;
+                si le errás dos veces, se va enojado.
+              </p>
+
+            </div>
+
+
+            <p>
+              Vigilá las dos barras: el
+              <strong>fondo de la fianza</strong> y el
+              <strong>estrés</strong>.
+              Con estrés alto empezás a perder clientes antes de atenderlos.
+            </p>
+
+          </div>
+
+
+          <!-- ==================== CONTROLES ==================== -->
+          <div
+            class="pi-seccion"
+            id="pi-controles"
+          >
+
+            <div class="pi-control">
+              <span class="pi-tecla">W A S D</span>
+              Caminar por el local
+            </div>
+            <div class="pi-control"><span class="pi-tecla">SHIFT</span> Correr (mantener apretado)</div>
+
+            <div class="pi-control">
+              <span class="pi-tecla">Mouse</span>
+              Arrastrar para mirar alrededor
+            </div>
+
+            <div class="pi-control">
+              <span class="pi-tecla">L</span>
+              Atender al cliente (cerca de la ventanita)
+            </div>
+
+            <div class="pi-control">
+              <span class="pi-tecla">E</span>
+              Salir por la puerta y cerrar el día
+            </div>
+
+            <div class="pi-control">
+              <span class="pi-tecla">R</span>
+              Resetear la vista si te perdés
+            </div>
+
+            <div class="pi-control">
+              <span class="pi-tecla">Botón</span>
+              "Abrir gestión del kiosco" para comprar y fijar precios
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- Nombre del kiosco -->
+        <div class="pi-nombreKiosco">
+          <label for="inputNombreKiosco">Poné el nombre de tu kiosco</label>
+          <input
+            type="text"
+            id="inputNombreKiosco"
+            maxlength="30"
+            placeholder="El Laburador"
+            autocomplete="off"
+          >
+        </div>
+
+        <!-- Botón para comenzar -->
+        <button
+          class="pi-jugar"
+          onclick="empezarJuego()"
+        >
+          Abrir el kiosco
+        </button>
+
+      </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         HUD SUPERIOR
+    ========================================================== -->
+    <div id="hud">
+
+      <!-- Semana -->
+      <div class="hud-block">
+
+        <div class="hud-label">
+          Semana
+        </div>
+
+        <div
+          class="hud-value"
+          id="hudSemana"
+        >
+          Sem 1 · Lunes
+        </div>
+
+      </div>
+
+
+      <!-- Caja -->
+      <div class="hud-block">
+
+        <div class="hud-label">
+          Caja
+        </div>
+
+        <div
+          class="hud-value"
+          id="hudCaja"
+        >
+          $0
+        </div>
+
+      </div>
+
+
+      <!-- Cartel -->
+      <div id="kioscoSign">
+        EL LABURADOR
+      </div>
+
+
+      <!-- Fondo para la fianza -->
+      <div
+        class="hud-block"
+        id="fianzaBar"
+      >
+
+        <div class="hud-label">
+          Fondo para la fianza
+        </div>
+
+        <div
+          class="hud-value"
+          id="hudFianza"
+        >
+          $0 / $50.000
+        </div>
+
+        <div class="bar-track">
+          <div
+            class="bar-fill"
+            id="fianzaFill"
+          ></div>
+        </div>
+
+      </div>
+
+
+      <!-- Préstamo activo (solo aparece si hay uno pendiente) -->
+      <div
+        class="hud-block oculto"
+        id="prestamoHud"
+      >
+
+        <div class="hud-label">
+          Préstamo
+        </div>
+
+        <div
+          class="hud-value"
+          id="hudPrestamo"
+        >
+          —
+        </div>
+
+      </div>
+
+
+      <!-- Estrés -->
+      <div
+        class="hud-block"
+        id="estresBar"
+      >
+
+        <div class="hud-label">
+          Estrés
+        </div>
+
+        <div
+          class="hud-value"
+          id="hudEstres"
+        >
+          Tranquilo
+        </div>
+
+        <div class="bar-track">
+          <div
+            class="bar-fill"
+            id="estresFill"
+          ></div>
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         AVISO: CERCA DE LA VENTANITA
+    ========================================================== -->
+    <div
+      id="promptInteraccion"
+      class="oculto"
+    >
+
+      <span class="tecla">
+        L
+      </span>
+
+      <span>
+        Atender cliente
+      </span>
+
+    </div>
+
+
+    <!-- =========================================================
+         AVISO: CERCA DE LA PUERTA
+    ========================================================== -->
+    <div
+      id="promptPuerta"
+      class="oculto"
+    >
+
+      <span class="tecla">
+        E
+      </span>
+
+      <span>
+        Cerrar el kiosco por hoy
+      </span>
+
+    </div>
+
+
+    <!-- =========================================================
+         DIÁLOGO: VENTAS Y FIN DE DÍA
+    ========================================================== -->
+    <div
+      id="dialogoCliente"
+      class="oculto"
+    >
+
+      <div
+        class="dc-titulo"
+        id="dcTitulo"
+      >
+        Cliente
+      </div>
+
+      <div
+        class="dc-texto"
+        id="dcTexto"
+      ></div>
+
+      <div
+        class="dc-botones"
+        id="dcBotones"
+      ></div>
+
+    </div>
+
+ <!-- ===== Cartel de evento diario ===== -->
+    <div id="eventoDia" class="oculto">
+      <div class="ed-etiqueta" id="edEtiqueta">EVENTO</div>
+      <div class="ed-titulo" id="edTitulo"></div>
+      <div class="ed-texto" id="edTexto"></div>
+      <div class="ed-botones" id="edBotones"></div>
+    </div>
+
+    <!-- Indicador de correr -->
+     <!-- Recordatorio de controles -->
+    <div id="ayudaControles">
+      <span><b>W A S D</b> moverte</span>
+      <span><b>SHIFT</b> correr</span>
+      <span><b>L</b> atender</span>
+      <span><b>E</b> salir</span>
+    </div>
+
+    <!-- Indicador de correr -->
+    <div id="indicadorCorrer" class="oculto">Corriendo</div>
+
+    <!-- =========================================================
+         JOYSTICK VIRTUAL (solo aparece en pantallas táctiles)
+    ========================================================== -->
+    <div id="joystickBase">
+      <div id="joystickStick"></div>
+    </div>
+
+<!-- ===== Mensaje del hermano (celular) ===== -->
+    <div id="mensajeHermano" class="oculto">
+      <div class="mh-celular">
+        <div class="mh-barra">
+          <span class="mh-contacto">Hermano</span>
+          <span class="mh-hora" id="mhHora">09:14</span>
+        </div>
+        <div class="mh-chat" id="mhChat"></div>
+        <div class="mh-respuestas" id="mhRespuestas"></div>
+      </div>
+    </div>
+
+
+    <!-- ===== Progreso de metas ===== -->
+    <div id="metasProgreso">
+      <div class="mp-titulo">Próxima meta</div>
+      <div class="mp-meta" id="mpMeta">—</div>
+      <div class="mp-falta" id="mpFalta">—</div>
+    </div>
+
+    <!-- ===== Cartel de meta alcanzada ===== -->
+    <div id="metaAlcanzada" class="oculto">
+      <div class="ma-caja">
+        <div class="ma-etiqueta">Meta alcanzada</div>
+        <div class="ma-titulo" id="maTitulo"></div>
+        <div class="ma-monto" id="maMonto"></div>
+        <div class="ma-premio">
+          <div class="ma-premio-titulo">Conseguiste</div>
+          <div class="ma-premio-texto" id="maPremio"></div>
+        </div>
+        <button class="btn" onclick="cerrarMetaAlcanzada()" style="width:100%;">Seguir</button>
+      </div>
+    </div>
+
+
+
+    <!-- =========================================================
+         BOTÓN DEL PANEL DE GESTIÓN
+    ========================================================== -->
+    <button
+      id="btnPanel"
+      onclick="togglePanel()"
+    >
+      Abrir gestión del kiosco
+    </button>
+
+
+    <!-- =========================================================
+         CARTEL GRANDE DE EVENTO
+         (Los tres caminos)
+    ========================================================== -->
+    <div
+      id="eventoGrande"
+      class="oculto"
+    >
+
+      <div class="eg-caja">
+
+        <div
+          class="eg-etiqueta"
+          id="egEtiqueta"
+        >
+          EVENTO
+        </div>
+
+        <div
+          class="eg-titulo"
+          id="egTitulo"
+        ></div>
+
+        <div
+          class="eg-relato"
+          id="egRelato"
+        ></div>
+
+        <div
+          class="eg-dialogo"
+          id="egDialogo"
+        ></div>
+
+        <div
+          class="eg-aviso"
+          id="egAviso"
+        ></div>
+
+        <div
+          class="eg-opciones"
+          id="egOpciones"
+        ></div>
+
+      </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         PANEL DE GESTIÓN
+    ========================================================== -->
+    <div
+      id="phasePanel"
+      class="oculto"
+    >
+
+      <!-- Navegación entre fases -->
+      <div id="navFases">
+
+        <button
+          class="navBtn activa"
+          onclick="irAFase('COMPRA', this)"
+        >
+          1. Comprar stock
+        </button>
+
+        <button
+          class="navBtn"
+          onclick="irAFase('PRECIOS', this)"
+        >
+          2. Fijar precios
+        </button>
+
+        <button
+          class="navBtn"
+          onclick="irAFase('PRESTAMO', this)"
+        >
+          3. Préstamo
+        </button>
+
+      </div>
+
+
+      <!-- Título de la fase -->
+      <div id="phaseTitle">
+        Compra de stock
+      </div>
+
+
+      <!-- Descripción de la fase -->
+      <div id="phaseSubtitle">
+        Decidí cuánto reponer de cada producto.
+      </div>
+
+
+      <!-- Contenido dinámico -->
+      <div id="phaseContent"></div>
+
+    </div>
+
+  </div>
+
+
+  <!-- =========================================================
+       JAVASCRIPT DEL JUEGO
+  ========================================================== -->
+  <!-- estado.js va primero: define las variables que usan los demás -->
+  <script src="js/estado.js"></script>
+  <script src="js/camara.js"></script>
+  <script src="js/escena.js"></script>
+  <script src="js/interfaz.js"></script>
+  <script src="js/cliente.js"></script>
+  <script src="js/ventas.js"></script>
+  <script src="js/eventos.js"></script>
+  <script src="js/caminos.js"></script>
+  <!-- juego.js va último: arranca todo cuando el resto ya está definido -->
+  <script src="js/juego.js"></script>
+</body>
+
+</html>
