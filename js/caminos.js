@@ -54,13 +54,9 @@ function continuarTrasBalance() {
   if (chequearSicario()) return;
 
   // 3. Eventos de los caminos, por prioridad narrativa
-  // (capoOfrecidoEnDia/coimaOfrecidaEnDia se reinician cada semana
-  // en confirmarFinDeSemana; acá solo evitan que, en el Modo Semana
-  // Límite, el mismo camino se ofrezca dos veces en la misma
-  // semana -- una por el chequeo diario y otra por este cierre.)
   if (ofrecerAbogado())        { eventoAbogado(mostrarResultadoEvento); return; }
-  if (!caminos.coimaOfrecidaEnDia && ofrecerCoima())          { caminos.coimaOfrecidaEnDia = true; eventoPolicia(mostrarResultadoEvento); return; }
-  if (!caminos.capoOfrecidoEnDia && ofrecerProteccionCapo()) { caminos.capoOfrecidoEnDia = true; eventoCapo(mostrarResultadoEvento); return; }
+  if (ofrecerCoima())          { eventoPolicia(mostrarResultadoEvento); return; }
+  if (ofrecerProteccionCapo()) { eventoCapo(mostrarResultadoEvento); return; }
 
   // 4. Semana tranquila
   avisoSemanaNueva();
@@ -89,82 +85,18 @@ function mostrarResultadoEvento(texto) {
 }
 
 // ==========================================================
-// OFERTAS TAMBIÉN AL CERRAR CADA DÍA
-// Con el chequeo semanal solo, una partida de 2 semanas
-// prácticamente nunca llega a cruzar más de un camino narrativo:
-// solo hay una ronda real de chequeo antes de que la partida
-// termine. Por eso se vuelve a evaluar si corresponde ofrecer un
-// camino cada vez que se cierra un día (no solo al cerrar la
-// semana).
-// ==========================================================
-function intentarOfrecerCaminoDelDia(extraMsg) {
-  if (caminos.partidaTerminada) return false;
-  if (caminos.delato) return false;   // ya se resolvió: se espera al sicario
-
-  cerrarDialogoCliente();
-
-  const callback = (texto) => mostrarResultadoEventoDia(texto, extraMsg);
-
-  if (ofrecerAbogado()) { eventoAbogado(callback); return true; }
-
-  if (!caminos.coimaOfrecidaEnDia && ofrecerCoima()) {
-    caminos.coimaOfrecidaEnDia = true;
-    eventoPolicia(callback);
-    return true;
-  }
-
-  if (!caminos.capoOfrecidoEnDia && ofrecerProteccionCapo()) {
-    caminos.capoOfrecidoEnDia = true;
-    eventoCapo(callback);
-    return true;
-  }
-
-  return false;
-}
-
-// Como mostrarResultadoEvento(), pero vuelve al día en curso en
-// vez de anunciar el arranque de una semana nueva.
-function mostrarResultadoEventoDia(texto, extraMsg) {
-  const dlg = document.getElementById('dialogoCliente');
-  dialogoAbierto = true;
-  dlg.classList.remove('oculto');
-
-  actualizarHUD();
-
-  document.getElementById('dcTitulo').textContent = 'Lo que pasó';
-  document.getElementById('dcTexto').innerHTML = `
-    ${texto}
-    <br><br>
-    <span style="color:#F2A93B;">
-      Amanece el ${nombreDiaActual()}, día ${gameState.diaActual} de ${gameState.diasPorSemana}.
-    </span>
-    ${caminos.clausurado > 0
-      ? '<br><br><span style="color:#ff6b66;">El local está CLAUSURADO esta semana: no vas a poder vender.</span>'
-      : ''}
-    ${extraMsg || ''}`;
-
-  document.getElementById('dcBotones').innerHTML =
-    '<button class="btn" onclick="abrirKioscoDelDia()">Abrir el kiosco</button>';
-}
-
-// ==========================================================
 // CAMINO 1 — EL CAPO
 // Protección semanal. Si te atrasás, las consecuencias son
 // peores que no haber aceptado nunca.
 // ==========================================================
 
 function ofrecerProteccionCapo() {
-  // Con solo 2 semanas de partida, la ventana se abre desde la
-  // primera semana y dura toda la partida.
-  const semanaMinima = 1;
-  const semanaMaxima  = gameState.totalSemanas;
-
   // Todas las condiciones deben cumplirse (&&)
   return !caminos.pagaProteccion
       && caminos.atrasosCapo === 0
       && !caminos.delato
-      && gameState.semanaActual >= semanaMinima
-      && gameState.semanaActual <= semanaMaxima
+      && gameState.semanaActual >= 2
+      && gameState.semanaActual <= 4
       && Math.random() < 0.55;
 }
 
@@ -188,7 +120,6 @@ function eventoCapo(alTerminar) {
         accion: () => {
           caminos.pagaProteccion = true;
           caminos.confianzaCapo = 0;
-          caminos.aceptoProteccionAlgunaVez = true;
           alTerminar('Aceptaste la protección del capo.');
         }
       },
@@ -215,11 +146,10 @@ function cobrarProteccion() {
     if (caminos.confianzaCapo >= 3 && Math.random() < 0.5) {
       texto += ' Te avisó: "cuidate esta semana, anda alguien raro rondando".';
     }
-    return { color: '#5FD96C', texto, exito: true };
+    return { color: '#5FD96C', texto };
   }
 
-  // No le alcanzó: atraso. Cuenta como "negarse" para la sumisión total
-  // (ver semanaActualSinNegarseCapo en confirmarFinDeSemana, eventos.js).
+  // No le alcanzó: atraso
   caminos.atrasosCapo++;
   caminos.confianzaCapo = 0;
   gameState.estres = Math.min(100, gameState.estres + 12);
@@ -229,8 +159,7 @@ function cobrarProteccion() {
     return {
       color: '#ff6b66',
       texto: `No le pudiste pagar al capo. Te lo perdonó, pero ahora te cobra
-              $${caminos.montoProteccion.toLocaleString('es-AR')} por semana.`,
-      exito: false
+              $${caminos.montoProteccion.toLocaleString('es-AR')} por semana.`
     };
   }
 
@@ -238,8 +167,7 @@ function cobrarProteccion() {
   return {
     color: '#ff6b66',
     texto: `Segundo atraso con el capo. Se cortó la protección y empezaron las represalias.
-            Ahora estás más expuesto que antes de pagarle.`,
-    exito: false
+            Ahora estás más expuesto que antes de pagarle.`
   };
 }
 
@@ -250,11 +178,7 @@ function cobrarProteccion() {
 
 function ofrecerAbogado() {
   if (caminos.abogadoOfrecido || caminos.delato) return false;
-
-  // Con solo 2 semanas en total, recién puede aparecer en la
-  // última semana.
-  const semanaMinima = gameState.totalSemanas;
-  if (gameState.semanaActual < semanaMinima) return false;
+  if (gameState.semanaActual < 4) return false;
 
   // Solo aparece si estás desesperado
   const lejosDeLaMeta = gameState.caja < gameState.metaFianza * 0.5;
@@ -344,13 +268,7 @@ function chequearSicario() {
 function ofrecerCoima() {
   if (caminos.pagaProteccion || caminos.delato) return false;
   if (caminos.vecesPolicia >= 3) return false;
-
-  // Con solo 2 semanas en total, puede aparecer ya desde la
-  // primera, para que la ventana no quede reducida a una sola
-  // semana real.
-  const semanaMinima = 1;
-  if (gameState.semanaActual < semanaMinima) return false;
-
+  if (gameState.semanaActual < 2) return false;
   if (caminos.clausurado > 0) return false;
   return Math.random() < 0.4;
 }
@@ -405,20 +323,7 @@ function eventoPolicia(alTerminar) {
           caminos.seNegoACoima = true;
           caminos.clausurado = 1;
           gameState.estres = Math.min(100, gameState.estres + 14);
-
-          let mensaje = 'Te plantaste y no pagaste. Te clausuraron el local por una semana.';
-
-          // Negarse a la coima en la última semana "de calendario"
-          // (la semana base -- hoy la 2 -- o cualquier semana de
-          // castigo que ya se haya desbloqueado) extiende la partida
-          // una semana más. En una semana anterior a esa no aplica:
-          // todavía queda una semana normal por delante.
-          if (gameState.semanaActual >= SEMANAS_BASE) {
-            gameState.totalSemanas++;
-            mensaje += ' Y no se queda ahí: se suma otra semana de plazo para la fianza.';
-          }
-
-          alTerminar(mensaje);
+          alTerminar('Te plantaste y no pagaste. Te clausuraron el local por una semana.');
         }
       }
     ]
@@ -476,22 +381,6 @@ const FINALES = {
     titulo: 'Fundido',
     texto: `Te quedaste sin plata y sin mercadería. El kiosco cerró. Tu hermano se queda adentro.`
   },
-  capo_sumision: {
-    titulo: 'Bajo su ala',
-    texto: `El capo cumplió: movió los hilos y tu hermano salió, directo, sin vueltas ni audiencia.
-            Nunca le dijiste que no. Ni una vez, ni con la plata ni con la mercadería, ni siquiera
-            cuando sabías que podía costarte la vida.<br><br>
-            Tu hermano está afuera, en tu casa, a salvo. Vos ya no sos dueño de tu propio kiosco:
-            sos parte de lo que el capo necesite, cuando lo necesite. Ganaste. No se siente
-            como ganar.`
-  },
-  capo_muerte: {
-    titulo: 'No hubo otra semana',
-    texto: `Le dijiste que no una vez de más. Esta vez no vinieron a discutir ni a dar un plazo.
-            <br><br>
-            Tu hermano sigue esperando, en una celda, una plata que ya nadie va a poder juntar
-            por vos.`
-  },
   quiebra_tecnica: {
     titulo: 'Lleno de mercadería, sin un peso',
     texto: `El estante estaba repleto. Habías comprado bien, tenías stock para semanas.
@@ -513,28 +402,8 @@ const FINALES = {
 function evaluarFinal() {
   if (caminos.finalObtenido) return caminos.finalObtenido;
 
-  // 0. Sumisión total al capo: pagó la protección Y entregó toda la
-  //    mercadería que le exigieron, sin negarse ni una sola vez, durante
-  //    una semana de castigo completa (semanaCastigoCerradaLimpia se
-  //    calcula en confirmarFinDeSemana, eventos.js, al cerrar cada
-  //    semana). Es un desenlace más específico y extremo que el final
-  //    "capo" de abajo, así que se chequea primero.
-  if (caminos.semanaCastigoCerradaLimpia) {
-    terminarPartida('capo_sumision');
-    return 'capo_sumision';
-  }
-
   // 1. Final del capo: confianza sostenida
-  // Antes el umbral era 1, porque con una partida de solo 2 semanas
-  // había como mucho una semana en la que se podía cobrar protección
-  // antes de que terminara. Ahora que la partida puede extenderse mucho
-  // más allá de 2 semanas (escalada de castigo), 1 pago dispararía este
-  // final casi apenas se acepta la protección. Se sube a 3 pagos
-  // SEGUIDOS: confianzaCapo se resetea a 0 ante cualquier atraso (ver
-  // cobrarProteccion), así que 3 exige continuidad real, no un golpe
-  // de suerte.
-  const umbralConfianzaCapo = 3;
-  if (caminos.pagaProteccion && caminos.confianzaCapo >= umbralConfianzaCapo && !caminos.delato) {
+  if (caminos.pagaProteccion && caminos.confianzaCapo >= 4 && !caminos.delato) {
     terminarPartida('capo');
     return 'capo';
   }
@@ -573,11 +442,8 @@ function evaluarFinal() {
     return final;
   }
 
-  // 6. Se acabaron las semanas (salvo que quede un sicario pendiente
-  //    por resolver: ese desenlace tiene prioridad sobre este final
-  //    genérico, si no nunca llegaría a mostrarse)
-  const sicarioPendiente = caminos.delato && caminos.semanaDelacion !== null;
-  if (gameState.semanaActual > gameState.totalSemanas && !sicarioPendiente) {
+  // 6. Se acabaron las semanas
+  if (gameState.semanaActual > gameState.totalSemanas) {
     const final = gameState.caja >= gameState.metaFianza * 0.5 ? 'salida_parcial' : 'bancarrota';
     terminarPartida(final);
     return final;

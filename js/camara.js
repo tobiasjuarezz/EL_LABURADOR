@@ -15,59 +15,12 @@ const ALTURA_OJOS = 65;
 let camAngulo = 0;   // giro horizontal
 let camPitch  = 0;   // giro vertical
 
-const VEL_MOV    = 7;
-const VEL_CORRER = 15;
-
-// Radio aproximado del jugador, para que no se meta dentro de los
-// muebles: no es un círculo real, es solo el margen que se le
-// suma a cada obstáculo para frenarlo un poco antes de tocarlo.
-const RADIO_JUGADOR = 28;
-
-// Obstáculos fijos del local (mostrador y estantes laterales), como
-// rectángulos en el plano X/Z. Los valores salen de la posición y el
-// tamaño con que se dibujan en escena.js (dibujarMostrador,
-// dibujarEstanteLateral). El estante principal se calcula aparte
-// porque su ancho depende de cuántos productos hay.
-const OBSTACULOS_FIJOS = [
-  // Mostrador: box(420, 60, 45) centrado en (0, 260)
-  { minX: -210, maxX: 210, minZ: 237, maxZ: 283 },
-  // Estante lateral izquierdo, mitad de atrás: (-780, -150)
-  { minX: -845, maxX: -715, minZ: -280, maxZ: -20 },
-  // Estante lateral izquierdo, mitad de adelante: (-780, 150)
-  { minX: -845, maxX: -715, minZ: 20, maxZ: 280 },
-  // Estante lateral derecho: (780, -350)
-  { minX: 715, maxX: 845, minZ: -480, maxZ: -220 },
-];
-
-// El estante principal (detrás del mostrador, con los productos a
-// la vista) cambia de ancho según cuántos productos tenga el kiosco,
-// así que su rectángulo se arma con la misma fórmula que lo dibuja.
-function obstaculoEstantePrincipal() {
-  const n = (typeof gameState !== 'undefined' && gameState.productos) ? gameState.productos.length : 8;
-  const espacio = 120;
-  const anchoTotal = espacio * n + 30;
-  return { minX: -anchoTotal / 2, maxX: anchoTotal / 2, minZ: -300, maxZ: -225 };
-}
-
-// ---- ¿Esa posición (x, z) se mete adentro de algún mueble? ----
-function colisionaConObstaculo(x, z) {
-  for (const o of OBSTACULOS_FIJOS) {
-    if (x > o.minX - RADIO_JUGADOR && x < o.maxX + RADIO_JUGADOR &&
-        z > o.minZ - RADIO_JUGADOR && z < o.maxZ + RADIO_JUGADOR) {
-      return true;
-    }
-  }
-  const ep = obstaculoEstantePrincipal();
-  if (x > ep.minX - RADIO_JUGADOR && x < ep.maxX + RADIO_JUGADOR &&
-      z > ep.minZ - RADIO_JUGADOR && z < ep.maxZ + RADIO_JUGADOR) {
-    return true;
-  }
-  return false;
-}
+const VEL_MOV    = 5;
+const VEL_CORRER = 11;
 
 // ---- Lee el teclado y mueve al jugador ----
 function actualizarMovimientoJugador() {
-  if (!juegoIniciado || diaBloqueado) return;
+  if (!juegoIniciado) return;
 
   // Vector "hacia adelante" según hacia dónde mira la cámara
   const dirX = -sin(camAngulo), dirZ = -cos(camAngulo);
@@ -102,22 +55,17 @@ function actualizarMovimientoJugador() {
   const indicador = document.getElementById('indicadorCorrer');
   if (indicador) indicador.classList.toggle('oculto', !corriendo);
 
-  if (mx !== 0 || mz !== 0) {
+  const seMueve = (mx !== 0 || mz !== 0);
+
+  if (seMueve) {
     // Se normaliza para que la diagonal no sea más rápida
     const mag = Math.hypot(mx, mz);
-    const pasoX = (mx / mag) * velocidad;
-    const pasoZ = (mz / mag) * velocidad;
-
-    // Cada eje se mueve por separado: si un mueble frena el avance
-    // en X, el jugador igual puede seguir deslizándose en Z (y
-    // viceversa), como en cualquier juego con paredes sólidas, en
-    // vez de quedar pegado en seco contra la esquina.
-    const nuevoX = constrain(jugX + pasoX, -850, 850);
-    if (!colisionaConObstaculo(nuevoX, jugZ)) jugX = nuevoX;
-
-    const nuevoZ = constrain(jugZ + pasoZ, -600, 300);
-    if (!colisionaConObstaculo(jugX, nuevoZ)) jugZ = nuevoZ;
+    jugX = constrain(jugX + (mx / mag) * velocidad, -850, 850);
+    jugZ = constrain(jugZ + (mz / mag) * velocidad, -600, 300);
   }
+
+  // Sonido de pasos del jugador (nunca usa "importante": eso es para NPCs)
+  actualizarSonidoPasos(seMueve, corriendo, false);
 }
 
 // ---- Ubica la cámara donde está el jugador ----

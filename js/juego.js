@@ -5,6 +5,7 @@
 // Este archivo solo arranca el juego y coordina el bucle.
 // Toda la lógica está repartida en los demás archivos:
 //   estado.js    → los datos del juego
+//   audio.js     → sonidos y música
 //   camara.js    → primera persona y movimiento
 //   escena.js    → dibujado 3D
 //   interfaz.js  → HUD y panel de gestión
@@ -12,6 +13,11 @@
 //   eventos.js   → eventos diarios y ciclo de días
 //   caminos.js   → los tres caminos y los finales
 // ==========================================================
+
+// p5.js ejecuta preload() ANTES de setup(), para cargar assets
+function preload() {
+  precargarAudio();
+}
 
 // p5.js ejecuta setup() UNA vez, al cargar la página
 function setup() {
@@ -28,6 +34,8 @@ function setup() {
   generarColoresClutter(); // colores fijos de la mercadería
   generarTexturas();       // texturas procedurales (madera, pared, piso)
   actualizarHUD();
+
+  audioListoInicializar(); // deja música y sonidos de pasos configurados
 
   inicializarControlesTactiles(); // joystick + mirar con el dedo, si es celular
 

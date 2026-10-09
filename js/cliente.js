@@ -156,64 +156,6 @@ const CLIENTES = [
       'Cerró el kiosco de la otra esquina. Ahora los clientes vienen todos para acá.',
       'Che, ¿sabías que están preguntando por vos en el barrio? Nada malo, eh. Creo.'
     ]
-  },
-
-  // ------------------------------------------------------
-  // Cliente millonario: compra de más, tolera precios altos sin
-  // quejarse ni irse, y a veces deja propina (ver ventas.js).
-  {
-    id: 'federico',
-    nombre: 'Federico',
-    visitas: 0,
-    tipo: 'millonario',
-    paciencia: 0.4,   // se impacienta bastante menos que el resto
-
-    frases: [
-      'Dejé la camioneta mal estacionada, pero bueno, total para eso están las multas.',
-      'Andá guardando, total la vuelta la usás vos, quedátela.',
-      'Mi contador me dice que gasto de más en pavadas. Yo le digo que las pavadas me hacen feliz.',
-      '¿Sabés lo que es hacer cuentas? Yo tampoco, para eso tengo gente.',
-      'El otro día pagué una fortuna por un vino que no me gustó nada. Ni me acuerdo cuál era.',
-      'Che, lindo local tenés. ¿Nunca pensaste en abrir uno más grande?'
-    ],
-
-    // Su historia: el yate que nunca usa
-    historia: [
-      'Me compré un yate. Todavía no lo vi en persona, lo tiene el que me lo vendió.',
-      'Fui a ver el yate. Es más chico de lo que pensaba. Igual lo dejé.',
-      'Le puse nombre al yate. "Segunda Casa". A mi mujer no le hizo gracia.',
-      'Salí una vez con el yate. Me mareé. No creo que vuelva a salir.',
-      'Estoy pensando en vender el yate y comprarme uno más grande. No sé por qué, la verdad.'
-    ]
-  },
-
-  // ------------------------------------------------------
-  // Cliente enojado: si te equivocás con el vuelto, el estrés que te
-  // genera es mayor que con cualquier otro cliente (ver ventas.js).
-  {
-    id: 'vasco',
-    nombre: 'El Vasco',
-    visitas: 0,
-    tipo: 'enojado',
-    paciencia: 1.8,   // se impacienta bastante más que el resto
-
-    frases: [
-      'Todo mal. El colectivo, el clima, la fila del banco. Todo mal.',
-      'No me hables de fútbol que perdimos otra vez. No preguntes cómo.',
-      'Che, ¿por qué todo tiene que ser tan caro? Antes esto valía la mitad.',
-      'Mi vecino puso la música fuerte hasta las tres de la mañana. Ya le voy a decir cuatro cosas.',
-      'No entiendo por qué todo el mundo anda con esa sonrisa de boludo. Yo no tengo ganas.',
-      'Vine acá porque es lo más cerca. Si hubiera algo más cerca, iba para allá.'
-    ],
-
-    // Su historia: la denuncia eterna al edificio de al lado
-    historia: [
-      'Estoy juntando firmas contra el edificio de al lado. Hacen obra desde las siete de la mañana.',
-      'Fui a la municipalidad por lo del edificio. Me atendieron mal. Ahora es personal.',
-      'El tema del edificio sigue. Ya van tres notas presentadas. Nadie hace nada.',
-      'Encontré un abogado que me quiere ayudar con lo del edificio. Al fin alguien serio.',
-      'Ganamos algo con lo del edificio. No mucho, pero algo. Primera buena noticia del año.'
-    ]
   }
 ];
 

@@ -9,7 +9,9 @@
 
   <!-- p5.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
 
+  
   <!-- Estilos -->
   <link rel="stylesheet" href="css/estilos.css">
 </head>
@@ -22,10 +24,6 @@
          CANVAS DEL JUEGO
     ========================================================== -->
     <div id="canvasWrapper"></div>
-
-    <!-- Grano de película sutil sobre el canvas: textura de ruido
-         animada por CSS puro, no consume nada del render 3D. -->
-    <div id="grano"></div>
 
 
     <!-- =========================================================
@@ -87,7 +85,7 @@
             <p>
               Tu hermano está preso esperando juicio. Podés sacarlo
               pagando una fianza de <strong>$50.000</strong>, pero tenés
-              <strong>2 semanas</strong> antes de la audiencia.
+              <strong>8 semanas</strong> antes de la audiencia.
             </p>
 
             <p>
@@ -97,9 +95,9 @@
             </p>
 
             <p>
-              Los gastos fijos (alquiler y luz) se cobran dos veces por
-              semana, tengas ventas o no. Y en el camino va a aparecer
-              gente ofreciéndote atajos. <strong>Ninguno es gratis.</strong>
+              Todas las semanas se pagan alquiler y luz, tengas ventas
+              o no. Y en el camino va a aparecer gente ofreciéndote
+              atajos. <strong>Ninguno es gratis.</strong>
             </p>
 
           </div>
@@ -175,26 +173,17 @@
               <li>
                 Cuando querés cerrar, caminás hasta la puerta de
                 <strong>SALIDA</strong> y pasás al día siguiente.
-                La semana tiene 6 días, de lunes a sábado.
+                La semana tiene 7 días.
               </li>
 
               <li>
-                Los gastos fijos (alquiler y luz) se cobran
-                <strong>dos veces por semana</strong>: la mitad el
-                miércoles y la otra mitad el sábado, que es el día en
-                que se hace el balance semanal.
+                Al terminar el domingo se hace el balance semanal
+                y se cobran los gastos fijos.
               </li>
 
               <li>
                 En el panel de gestión comprás stock y le ponés
                 precio a cada producto.
-              </li>
-
-              <li>
-                Atendés hasta <strong>10 clientes por día</strong>: al
-                décimo, el kiosco cierra solo y pasa al día siguiente.
-                También podés cerrar antes vos mismo caminando hasta
-                la puerta de <strong>SALIDA</strong>.
               </li>
 
             </ol>
@@ -279,24 +268,12 @@
         </div>
 
 
-        <!-- Nombre del kiosco -->
-        <div class="pi-nombreKiosco">
-          <label for="inputNombreKiosco">Poné el nombre de tu kiosco</label>
-          <input
-            type="text"
-            id="inputNombreKiosco"
-            maxlength="30"
-            placeholder="El Laburador"
-            autocomplete="off"
-          >
-        </div>
+        <button class="pi-jugar" id="btnContinuar" onclick="continuarPartida()" style="display:none;">
+        Continuar partida
+        </button>
 
-        <!-- Botón para comenzar -->
-        <button
-          class="pi-jugar"
-          onclick="empezarJuego()"
-        >
-          Abrir el kiosco
+        <button class="pi-jugar" onclick="nuevaPartidaConfirmar()">
+        Abrir el kiosco
         </button>
 
       </div>
@@ -371,26 +348,6 @@
             class="bar-fill"
             id="fianzaFill"
           ></div>
-        </div>
-
-      </div>
-
-
-      <!-- Préstamo activo (solo aparece si hay uno pendiente) -->
-      <div
-        class="hud-block oculto"
-        id="prestamoHud"
-      >
-
-        <div class="hud-label">
-          Préstamo
-        </div>
-
-        <div
-          class="hud-value"
-          id="hudPrestamo"
-        >
-          —
         </div>
 
       </div>
@@ -637,13 +594,6 @@
           2. Fijar precios
         </button>
 
-        <button
-          class="navBtn"
-          onclick="irAFase('PRESTAMO', this)"
-        >
-          3. Préstamo
-        </button>
-
       </div>
 
 
@@ -666,21 +616,54 @@
 
   </div>
 
+  <!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+  import {
+    getFirestore, doc, setDoc, getDoc
+  } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBDQ3afbcbc_DU-tQXVLWHyJcA6IIUAGJM",
+    authDomain: "el-laburador.firebaseapp.com",
+    projectId: "el-laburador",
+    storageBucket: "el-laburador.firebasestorage.app",
+    messagingSenderId: "714750254875",
+    appId: "1:714750254875:web:6f55497ff0fce97d20fdbe"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Puente: como los demás scripts del juego NO son módulos,
+  // se guardan estas funciones en window para poder usarlas
+  // desde guardado.js como si fueran globales normales.
+  window.firebaseDB = db;
+  window.firebaseDoc = doc;
+  window.firebaseSetDoc = setDoc;
+  window.firebaseGetDoc = getDoc;
+
+  // Avisa que Firebase ya está listo (los scripts módulo cargan
+  // async, puede que terminen después que guardado.js)
+  window.dispatchEvent(new Event('firebaseListo'));
+</script>
 
   <!-- =========================================================
        JAVASCRIPT DEL JUEGO
   ========================================================== -->
-  <!-- estado.js va primero: define las variables que usan los demás -->
-  <script src="js/estado.js"></script>
-  <script src="js/camara.js"></script>
-  <script src="js/escena.js"></script>
-  <script src="js/interfaz.js"></script>
-  <script src="js/cliente.js"></script>
-  <script src="js/ventas.js"></script>
-  <script src="js/eventos.js"></script>
-  <script src="js/caminos.js"></script>
-  <!-- juego.js va último: arranca todo cuando el resto ya está definido -->
-  <script src="js/juego.js"></script>
+<!-- estado.js va primero: define las variables que usan los demás -->
+<script src="js/estado.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/guardado.js"></script>
+<script src="js/camara.js"></script>
+<script src="js/escena.js"></script>
+<script src="js/interfaz.js"></script>
+<script src="js/cliente.js"></script>
+<script src="js/ventas.js"></script>
+<script src="js/eventos.js"></script>
+<script src="js/caminos.js"></script>
+<!-- juego.js va último: arranca todo cuando el resto ya está definido -->
+<script src="js/juego.js"></script>
 </body>
 
 </html>

@@ -28,20 +28,6 @@ function actualizarHUD() {
   const pct = Math.min(100, (gameState.caja / gameState.metaFianza) * 100);
   document.getElementById('fianzaFill').style.width = pct + '%';
 
-  // Préstamo voluntario activo: se muestra en el HUD para que el
-  // plazo de PLAZO_PRESTAMO_DIAS nunca quede escondido en un submenú.
-  const bloquePrestamo = document.getElementById('prestamoHud');
-  if (bloquePrestamo) {
-    if (prestamo.activo) {
-      bloquePrestamo.classList.remove('oculto');
-      const diasRestantes = Math.max(0, prestamo.diaGlobalVencimiento - gameState.diaGlobal);
-      document.getElementById('hudPrestamo').textContent =
-        `$${prestamo.monto.toLocaleString('es-AR')} · ${diasRestantes}d`;
-    } else {
-      bloquePrestamo.classList.add('oculto');
-    }
-  }
-
   document.getElementById('estresFill').style.width = gameState.estres + '%';
 
   let estadoEstres = 'Tranquilo';
@@ -55,47 +41,15 @@ function actualizarHUD() {
 
   actualizarProgresoMetas();
 
-  // ¿Llegó a la meta? La partida termina en victoria al instante, sin
-  // esperar a que cierre la semana (tiene prioridad sobre el colapso).
-  if (chequearVictoriaInstantanea()) return;
-
   // ¿Llegó a 100? La partida termina acá mismo
   chequearColapso();
-}
-
-// ==========================================================
-// VICTORIA INSTANTÁNEA
-// En cuanto gameState.caja alcanza la meta, la partida termina en
-// victoria ahí mismo -- sin importar la semana, si el local está
-// clausurado, o si hay una escalada de castigo en curso.
-// ==========================================================
-function chequearVictoriaInstantanea() {
-  if (caminos.partidaTerminada) return false;
-  if (gameState.caja < gameState.metaFianza) return false;
-
-  // Mismo criterio de "cómo llegaste" que ya usa evaluarFinal() al
-  // cierre de semana para elegir entre las variantes con policía.
-  let final = 'meta_solo';
-  if (caminos.vecesPolicia > 0) {
-    final = caminos.seNegoACoima ? 'policia_intachable' : 'policia_limpio';
-  }
-  terminarPartida(final);
-
-  // Cierra cualquier ventana que esté abierta
-  document.getElementById('dialogoCliente').classList.add('oculto');
-  document.getElementById('eventoDia').classList.add('oculto');
-  document.getElementById('mensajeHermano').classList.add('oculto');
-  cerrarEventoGrande();
-
-  // Un instante de pausa antes del final, para que se sienta el golpe
-  setTimeout(() => renderFinal(final), 400);
-  return true;
 }
 
 // ==========================================================
 // PANTALLA DE INICIO
 // ==========================================================
 function mostrarTabInicio(id, btn) {
+  sonidoClick();
   document.querySelectorAll('.pi-seccion').forEach(s => s.classList.remove('activa'));
   document.querySelectorAll('.pi-tab').forEach(t => t.classList.remove('activa'));
   document.getElementById('pi-' + id).classList.add('activa');
@@ -103,26 +57,46 @@ function mostrarTabInicio(id, btn) {
 }
 
 function empezarJuego() {
+  sonidoClick();
   juegoIniciado = true;
   document.getElementById('pantallaInicio').classList.add('oculto');
 
-  // Nombre personalizado del kiosco (task 9): si el jugador dejó el
-  // campo vacío, se queda con el default que ya trae gameState.
-  const inputNombre = document.getElementById('inputNombreKiosco');
-  const nombreElegido = inputNombre ? inputNombre.value.trim() : '';
-  if (nombreElegido) gameState.nombreKiosco = nombreElegido;
+  iniciarMusicaAmbiente();
 
-  document.getElementById('kioscoSign').textContent = gameState.nombreKiosco;
-  document.title = `${gameState.nombreKiosco} — El Laburador`;
-
-  // El primer día también es lunes: llega el mensaje del hermano
   setTimeout(abrirKioscoDelDia, 400);
+}
+
+async function continuarPartida() {
+  sonidoClick();
+
+  const cargado = await cargarPartida();
+  if (!cargado) {
+    sonidoError();
+    alert('No se pudo cargar la partida guardada.');
+    return;
+  }
+
+  juegoIniciado = true;
+  document.getElementById('pantallaInicio').classList.add('oculto');
+
+  iniciarMusicaAmbiente();
+  actualizarHUD();
+}
+
+function nuevaPartidaConfirmar() {
+  if (haySartidaGuardada()) {
+    const confirmar = confirm('Ya hay una partida guardada. ¿Empezar una nueva de todos modos? Se va a perder el progreso guardado.');
+    if (!confirmar) return;
+    borrarPartidaGuardada();
+  }
+  empezarJuego();
 }
 
 // ==========================================================
 // PANEL DE GESTIÓN
 // ==========================================================
 function togglePanel() {
+  sonidoClick();
   const panel = document.getElementById('phasePanel');
   const btn = document.getElementById('btnPanel');
   const estabaOculto = panel.classList.contains('oculto');
@@ -135,6 +109,7 @@ function togglePanel() {
 }
 
 function irAFase(fase, btn) {
+  sonidoClick();
   document.querySelectorAll('.navBtn').forEach(b => b.classList.remove('activa'));
   if (btn) btn.classList.add('activa');
 
@@ -143,11 +118,6 @@ function irAFase(fase, btn) {
     document.getElementById('phaseSubtitle').textContent =
       'Decidí cuánto reponer de cada producto.';
     renderFaseCompra();
-  } else if (fase === 'PRESTAMO') {
-    document.getElementById('phaseTitle').textContent = 'Préstamo voluntario';
-    document.getElementById('phaseSubtitle').textContent =
-      `Sin interés, pero con ${PLAZO_PRESTAMO_DIAS} días de plazo. Si no lo devolvés a tiempo, perdés.`;
-    renderFasePrestamo();
   } else {
     document.getElementById('phaseTitle').textContent = 'Fijación de precios';
     document.getElementById('phaseSubtitle').textContent =
@@ -162,13 +132,12 @@ function renderFaseCompra() {
   let html = '';
 
   for (const p of gameState.productos) {
-    const costoUnit = p.costo;
-    const subtotal = costoUnit * (p.cantidadCompra || 0);
+    const subtotal = p.costo * (p.cantidadCompra || 0);
     html += `
       <div class="compraRow">
         <div class="compraNombre">${p.nombre}</div>
         <div class="compraDato">Stock: ${p.stock}</div>
-        <div class="compraDato">$${costoUnit.toLocaleString('es-AR')} c/u</div>
+        <div class="compraDato">$${p.costo.toLocaleString('es-AR')} c/u</div>
         <button class="qtyBtn" onclick="cambiarCantidadCompra('${p.id}', -1)">−</button>
         <span class="qtyValor" id="qty-${p.id}">${p.cantidadCompra || 0}</span>
         <button class="qtyBtn" onclick="cambiarCantidadCompra('${p.id}', 1)">+</button>
@@ -214,6 +183,8 @@ function renderFaseCompra() {
 
   html += '</div>';
 
+  html += `<button class="btn btnSecundario" style="margin-top:12px; width:100%;" onclick="guardarPartidaManual()">💾 Guardar partida</button>`;
+
   cont.innerHTML = html;
 }
 
@@ -224,6 +195,7 @@ function calcularTotalCompra() {
 }
 
 function cambiarCantidadCompra(id, delta) {
+  sonidoClick();
   const p = gameState.productos.find(prod => prod.id === id);
   if (!p) return;
 
@@ -245,6 +217,7 @@ function cambiarCantidadCompra(id, delta) {
 }
 
 function cancelarCompra() {
+  sonidoClick();
   for (const p of gameState.productos) p.cantidadCompra = 0;
   renderFaseCompra();
 }
@@ -253,174 +226,80 @@ function confirmarCompra() {
   const total = calcularTotalCompra();
 
   if (total === 0) {
+    sonidoError();
     alert('No pusiste cantidad en ningún producto.');
     return;
   }
   if (total > gameState.caja) {
+    sonidoError();
     alert('No te alcanza la caja para esta compra.');
     return;
   }
 
   for (const p of gameState.productos) {
-    if (p.cantidadCompra > 0) {
-      // Se trata todo el stock de un producto como si tuviera la
-      // antigüedad de la compra más reciente (ver comentario en
-      // estado.js, junto a diasVencimiento).
-      p.diaIngresoStock = gameState.diaGlobal;
-    }
     p.stock += (p.cantidadCompra || 0);
     p.cantidadCompra = 0;
   }
   gameState.caja -= total;
 
+  sonidoVenta();
   actualizarHUD();
   renderFaseCompra();
   alert(`Compra confirmada por $${total.toLocaleString('es-AR')}. El estante ya refleja el nuevo stock.`);
 }
 
-// ---- Fijación de precios (rediseñado, task 12) ----
-// Ya no hay sliders: el jugador ve el costo real (referencia fija) y
-// escribe a mano el precio de venta, mira el beneficio que le queda
-// por unidad, y confirma con "De acuerdo". La relación precio-demanda
-// se mantiene igual que antes (ver abrirDialogoCliente, en
-// ventas.js): más barato que el precio justo del mercado se pide más,
-// al precio justo se vende normal, más caro hay quejas y se vende menos.
+// ---- Fijación de precios ----
+// El jugador NO ve el precio justo como número: solo una marca
+// visual y el color. Tiene que aprender por tanteo.
 function renderFasePrecios() {
   const cont = document.getElementById('phaseContent');
 
   let html = `<div class="precioLeyenda">
-    Tenés de referencia lo que <strong>realmente te sale</strong> cada producto (el costo).
-    Escribí el precio de venta a mano, fijate el beneficio, y confirmá con "De acuerdo".
-    <br>Barato: se lo piden más. Al precio justo: vende normal.
-    Caro: se quejan y compran menos.
+    La <span>línea ámbar</span> marca la referencia del mercado.
+    Verde = precio equilibrado · Celeste = barato · Rojo = caro.
   </div>`;
 
   for (const p of gameState.productos) {
-    html += renderFilaPrecio(p);
+    // El slider va del 40% al 180% del precio justo
+    const min = Math.round((p.precioJusto * 0.4) / 10) * 10;
+    const max = Math.round((p.precioJusto * 1.8) / 10) * 10;
+    // Dónde cae el precio justo dentro de ese rango
+    const pct = ((p.precioJusto - min) / (max - min)) * 100;
+
+    html += `
+      <div class="precioRow">
+        <div class="precioNombre">${p.nombre}</div>
+        <div class="precioCosto">Costo: $${p.costo.toLocaleString('es-AR')}</div>
+        <div class="precioSliderWrap">
+          <div class="precioMarker" style="left: calc(${pct}% - 1.5px);"></div>
+          <input type="range" class="precioSlider"
+                 min="${min}" max="${max}" step="10" value="${p.precio}"
+                 oninput="cambiarPrecio('${p.id}', this.value)">
+        </div>
+        <div class="precioValor ${clasificarPrecio(p)}" id="precioValor-${p.id}">
+          $${p.precio.toLocaleString('es-AR')}
+        </div>
+      </div>`;
   }
 
   cont.innerHTML = html;
 }
 
-function renderFilaPrecio(p) {
-  const beneficio = p.precio - p.costo;
-  return `
-    <div class="precioRow" id="precioRow-${p.id}">
-      <div class="precioNombre">${p.nombre}</div>
-      <div class="precioCosto">Costo real<br><strong>$${p.costo.toLocaleString('es-AR')}</strong></div>
-      <div class="precioInputWrap">
-        <span>Vender a $</span>
-        <input type="number" step="10" min="0" class="precioInput" id="precioInput-${p.id}"
-               value="${p.precio}" oninput="cambiarPrecioBorrador('${p.id}', this.value)">
-      </div>
-      <div class="precioBeneficio ${clasificarBeneficio(beneficio)}" id="precioBeneficio-${p.id}">
-        Beneficio: $${beneficio.toLocaleString('es-AR')} / u.
-      </div>
-      <button class="btn btnChico" id="precioOk-${p.id}" onclick="confirmarPrecioProducto('${p.id}')">De acuerdo</button>
-    </div>`;
+function clasificarPrecio(p) {
+  const distancia = Math.abs(p.precio - p.precioJusto) / p.precioJusto;
+  if (distancia <= 0.08) return 'justo';
+  return p.precio < p.precioJusto ? 'bajo' : 'alto';
 }
 
-function clasificarBeneficio(beneficio) {
-  if (beneficio < 0) return 'negativo';
-  if (beneficio === 0) return 'nulo';
-  return 'positivo';
-}
-
-function cambiarPrecioBorrador(id, valor) {
+function cambiarPrecio(id, valor) {
   const p = gameState.productos.find(prod => prod.id === id);
   if (!p) return;
 
-  const nuevo = Math.max(0, Number(valor) || 0);
-  const beneficio = nuevo - p.costo;
-  const el = document.getElementById(`precioBeneficio-${id}`);
-  el.textContent = `Beneficio: $${beneficio.toLocaleString('es-AR')} / u.`;
-  el.className = `precioBeneficio ${clasificarBeneficio(beneficio)}`;
+  p.precio = Number(valor);
 
-  const btn = document.getElementById(`precioOk-${id}`);
-  if (btn) btn.textContent = 'De acuerdo';
-}
-
-function confirmarPrecioProducto(id) {
-  const p = gameState.productos.find(prod => prod.id === id);
-  const input = document.getElementById(`precioInput-${id}`);
-  if (!p || !input) return;
-
-  p.precio = Math.max(0, Math.round((Number(input.value) || 0) / 10) * 10);
-  input.value = p.precio;
-
-  const btn = document.getElementById(`precioOk-${id}`);
-  if (btn) {
-    btn.textContent = 'Guardado ✓';
-    setTimeout(() => { if (btn) btn.textContent = 'De acuerdo'; }, 1000);
-  }
-}
-
-// ---- Préstamo voluntario (task 9 de la lista de 14) ----
-// Sin interés: se debe exactamente lo que se pidió, pero con un plazo
-// corto de PLAZO_PRESTAMO_DIAS días (gameState.diaGlobal). Si se
-// cumple el plazo sin devolverlo, se pierde la partida (ver
-// chequearVencimientoPrestamo, en eventos.js).
-function renderFasePrestamo() {
-  const cont = document.getElementById('phaseContent');
-
-  if (prestamo.activo) {
-    const diasRestantes = prestamo.diaGlobalVencimiento - gameState.diaGlobal;
-    const alcanza = gameState.caja >= prestamo.monto;
-
-    cont.innerHTML = `
-      <div class="prestamoResumen">
-        <div>Debés <strong>$${prestamo.monto.toLocaleString('es-AR')}</strong> (sin interés).</div>
-        <div class="${diasRestantes <= 1 ? 'prestamoUrgente' : ''}" style="margin-top:6px;">
-          Te quedan <strong>${Math.max(0, diasRestantes)}</strong> día(s) para devolverlo.
-          Si se cumple el plazo y no pagaste, perdés la partida.
-        </div>
-      </div>
-      <div style="display:flex; gap:10px; margin-top:14px;">
-        <button class="btn" onclick="devolverPrestamo()" ${alcanza ? '' : 'disabled'}>
-          Devolver ahora ($${prestamo.monto.toLocaleString('es-AR')})
-        </button>
-      </div>
-      ${alcanza ? '' : '<div class="prestamoAviso">Todavía no te alcanza la caja para devolverlo.</div>'}`;
-    return;
-  }
-
-  cont.innerHTML = `
-    <div class="prestamoIntro">
-      Un prestamista del barrio te presta plata para reforzar la compra de stock.
-      Sin interés, pero con un plazo corto: <strong>${PLAZO_PRESTAMO_DIAS} días</strong>.
-      Si no se lo devolvés a tiempo, perdés el kiosco.
-    </div>
-    <div class="prestamoMontos">
-      <button class="btn btnSecundario" onclick="pedirPrestamo(3000)">Pedir $3.000</button>
-      <button class="btn btnSecundario" onclick="pedirPrestamo(6000)">Pedir $6.000</button>
-      <button class="btn btnSecundario" onclick="pedirPrestamo(10000)">Pedir $10.000</button>
-    </div>`;
-}
-
-function pedirPrestamo(monto) {
-  if (prestamo.activo) return;
-
-  prestamo.activo = true;
-  prestamo.monto = monto;
-  prestamo.diaGlobalPedido = gameState.diaGlobal;
-  prestamo.diaGlobalVencimiento = gameState.diaGlobal + PLAZO_PRESTAMO_DIAS;
-
-  gameState.caja += monto;
-  actualizarHUD();
-  renderFasePrestamo();
-}
-
-function devolverPrestamo() {
-  if (!prestamo.activo || gameState.caja < prestamo.monto) return;
-
-  gameState.caja -= prestamo.monto;
-  prestamo.activo = false;
-  prestamo.monto = 0;
-  prestamo.diaGlobalPedido = null;
-  prestamo.diaGlobalVencimiento = null;
-
-  actualizarHUD();
-  renderFasePrestamo();
+  const el = document.getElementById(`precioValor-${id}`);
+  el.textContent = `$${p.precio.toLocaleString('es-AR')}`;
+  el.className = `precioValor ${clasificarPrecio(p)}`;
 }
 
 // ==========================================================
@@ -441,14 +320,10 @@ const METAS = [
   {
     monto: 16000,
     titulo: 'Heladera nueva',
-    premio: 'Heladera con batería + café en vaso',
+    premio: 'Heladera con batería',
     descripcion: 'Compraste una heladera que aguanta los cortes de luz. ' +
-                 'Ya no se te van a echar a perder las bebidas. Además, con la heladera ' +
-                 'nueva sumaste café en vaso al catálogo.',
-    aplicar: () => {
-      mejoras.heladeraNueva = true;
-      gameState.productos.push({ ...PRODUCTOS_DESBLOQUEABLES.cafe });
-    }
+                 'Ya no se te van a echar a perder las bebidas.',
+    aplicar: () => { mejoras.heladeraNueva = true; }
   },
   {
     monto: 25000,
@@ -461,14 +336,10 @@ const METAS = [
   {
     monto: 34000,
     titulo: 'Ya casi',
-    premio: 'Cámara de seguridad + sanguches',
+    premio: 'Cámara de seguridad',
     descripcion: 'Instalaste una cámara sobre el mostrador. Los que vienen a probar ' +
-                 'suerte lo piensan dos veces: bajan mucho los robos. Con más movimiento ' +
-                 'en el local, sumaste sanguches al catálogo.',
-    aplicar: () => {
-      mejoras.camaraSeguridad = true;
-      gameState.productos.push({ ...PRODUCTOS_DESBLOQUEABLES.sanguche });
-    }
+                 'suerte lo piensan dos veces: bajan mucho los robos.',
+    aplicar: () => { mejoras.camaraSeguridad = true; }
   },
   {
     monto: 43000,
@@ -488,10 +359,6 @@ const METAS = [
 let metasAlcanzadas = 0;
 
 function chequearMetas() {
-  // Si la partida ya terminó (por ejemplo, por chequearVictoriaInstantanea
-  // en la misma jugada que disparó esto), no hay que mostrar un cartel
-  // de meta alcanzada peleando con el cartel de final.
-  if (caminos.partidaTerminada) return false;
   if (metasAlcanzadas >= METAS.length) return false;
 
   const meta = METAS[metasAlcanzadas];
@@ -504,6 +371,7 @@ function chequearMetas() {
 }
 
 function mostrarMetaAlcanzada(meta) {
+  sonidoVenta();
   document.getElementById('maTitulo').textContent = meta.titulo;
   document.getElementById('maMonto').textContent =
     `Superaste los $${meta.monto.toLocaleString('es-AR')}`;
@@ -515,6 +383,7 @@ function mostrarMetaAlcanzada(meta) {
 }
 
 function cerrarMetaAlcanzada() {
+  sonidoClick();
   dialogoAbierto = false;
   document.getElementById('metaAlcanzada').classList.add('oculto');
   actualizarProgresoMetas();
@@ -550,6 +419,7 @@ function chequearColapso() {
   if (caminos.partidaTerminada) return false;
   if (gameState.estres < 100) return false;
 
+  detenerMusicaAmbiente();
   terminarPartida('colapso_estres');
 
   // Cierra cualquier ventana que esté abierta

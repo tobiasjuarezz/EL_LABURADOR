@@ -28,55 +28,14 @@ function generarColoresClutter() {
 // Así la madera, la pared y el piso dejan de verse como
 // plástico liso, sin bajar el rendimiento (se generan una vez).
 // ==========================================================
-let texturaMadera, texturaMaderaOscura, texturaPared, texturaMetal, texturaPisoDetalle, texturaGrafiti;
-
+let texturaMadera, texturaMaderaOscura, texturaPared, texturaMetal, texturaPisoDetalle;
+ 
 function generarTexturas() {
   texturaMadera       = crearTexturaMadera(256, 256, PALETA.maderaClara);
   texturaMaderaOscura = crearTexturaMadera(256, 256, PALETA.maderaOscura);
   texturaPared        = crearTexturaPared(256, 256);
   texturaMetal        = crearTexturaMetal(128, 128);
   texturaPisoDetalle  = crearTexturaPiso(256, 256);
-  texturaGrafiti      = crearTexturaGrafiti(256, 256);
-}
-
-// Grafiti/tag sobre fondo transparente: se aplica como una capa
-// extra sobre la fachada cuando el kiosco está muy degradado (ver
-// dibujarGrafiti, más abajo). Trazos sueltos + una "firma" más
-// densa en una esquina, como un tag apurado.
-function crearTexturaGrafiti(w, h) {
-  const pg = createGraphics(w, h);
-  pg.clear();
-  pg.noFill();
-
-  const colores = [[210, 40, 40], [230, 200, 40], [60, 140, 220], [235, 235, 230]];
-  for (let i = 0; i < 5; i++) {
-    const c = colores[i % colores.length];
-    pg.stroke(c[0], c[1], c[2], 200);
-    pg.strokeWeight(3 + (i % 3));
-    let x = (w / 5) * i + 10, y = 20 + (i % 2) * 30;
-    pg.beginShape();
-    for (let s = 0; s < 8; s++) {
-      pg.vertex(x, y);
-      x += ((s % 2 === 0) ? 1 : -1) * (18 + i * 3);
-      y += 22 + (s % 3) * 6;
-      x = constrain(x, 6, w - 6);
-      y = constrain(y, 6, h - 6);
-    }
-    pg.endShape();
-  }
-
-  pg.stroke(255, 255, 255, 190);
-  pg.strokeWeight(4);
-  let tx = w * 0.58, ty = h * 0.62;
-  pg.beginShape();
-  for (let s = 0; s < 9; s++) {
-    pg.vertex(tx, ty);
-    tx += ((s % 2 === 0) ? 1 : -1) * 22;
-    ty += (s % 2 === 0) ? 14 : -6;
-  }
-  pg.endShape();
-
-  return pg;
 }
  
 // Vetas de madera: franjas horizontales de tono variable más
@@ -378,26 +337,6 @@ function dibujarFachadaConVentana() {
   dibujarRejas(zFachada);
   dibujarToldo(zFachada);
   dibujarCartelTienda(zFachada);
-  dibujarGrafiti(zFachada);
-  reflejoLuzEnPiso(0, zFachada - 60, PALETA.neon, 160, 40);
-}
-
-// Grafiti sobre el panel izquierdo de la fachada: solo aparece
-// cuando factorDegradacion() (deuda/camino/clausura, ronda 2) está
-// alto. No hay geometría nueva, es la misma textura aplicada como
-// una capa extra semitransparente sobre la pared ya existente.
-function dibujarGrafiti(zFachada) {
-  const d = factorDegradacion();
-  if (d < 0.45 || !texturaGrafiti) return;
-
-  push();
-  translate(-680, 20, zFachada + 11);
-  tint(255, 255, 255, Math.min(255, 110 + d * 130));
-  texture(texturaGrafiti);
-  noStroke();
-  plane(380, 300);
-  noTint();
-  pop();
 }
  
 // --- Toldo a rayas sobre la ventanita: le da carácter de "kiosco de barrio" ---
@@ -445,45 +384,23 @@ function dibujarToldo(zFachada) {
  
 // --- Cartel del negocio, iluminado por dentro, justo sobre la ventana ---
 function dibujarCartelTienda(zFachada) {
-  const d = factorDegradacion();
-
-  // Pulso suave normal (mismo criterio que el tubo fluorescente:
-  // dos ondas de distinta frecuencia para que no sea rítmico). Muy
-  // degradado, se le suma un titileo más brusco, como si estuviera
-  // por fundirse.
-  const pulsoBase = 0.86 + sin(frameCount * 1.6) * 0.14;
-  const parpadeoExtra = d > 0.5 ? (sin(frameCount * 9.3) * 0.5 + 0.5) * d * 0.5 : 0;
-  const pulso = Math.max(0.12, pulsoBase - parpadeoExtra);
-  const brilloNeon = PALETA.neon.map(c => c * pulso);
-
   push();
   translate(0, -318, zFachada + 26);
-
+ 
   // Caja del cartel
   push();
   fill(24, 22, 20);
   box(560, 70, 16);
   pop();
-
+ 
   // Panel luminoso interior (emissiveMaterial: se ve "prendido"
   // sin depender de las luces de la escena, como un cartel real)
   push();
   translate(0, 0, 9);
-  emissiveMaterial(...brilloNeon);
+  emissiveMaterial(...PALETA.neon);
   box(536, 48, 4);
   pop();
-
-  // Con el cartel luminoso conseguido (mejora de la meta de $25.000,
-  // ver interfaz.js) se agrega un halo detrás, más resplandor real.
-  if (typeof mejoras !== 'undefined' && mejoras.carteLuminoso) {
-    push();
-    translate(0, 0, 2);
-    noStroke();
-    fill(brilloNeon[0], brilloNeon[1], brilloNeon[2], 40);
-    plane(640, 110);
-    pop();
-  }
-
+ 
   pop();
 }
  
@@ -991,11 +908,10 @@ function dibujarFachadasCalle() {
     pop();
  
     // Ventana con luz prendida (emissive: se ve realmente iluminada
-    // de noche, no solo un color plano). De día se apaga sola.
+    // de noche, no solo un color plano)
     push();
     translate(casa.x, 120, zCasas - 12);
-    const intensidadVentana = intensidadLucesArtificiales();
-    emissiveMaterial(...PALETA_CALLE.farolLuz.map(c => c * (0.1 + intensidadVentana * 0.9)));
+    emissiveMaterial(...PALETA_CALLE.farolLuz);
     box(56, 70, 4);
     pop();
  
@@ -1017,47 +933,6 @@ function dibujarFachadasCalle() {
   }
  
   dibujarAutosEstacionados();
-  dibujarArbolesCalle();
-}
-
-// Árboles en la vereda de enfrente: rompen la fila de casas y le dan
-// más profundidad/variedad a la calle sin agregar nada al gameplay.
-function dibujarArbolesCalle() {
-  for (const x of [-870, -180, 520, 1080]) {
-    push();
-    translate(x, 190, 1030);
-
-    ambientMaterial(58, 40, 26);
-    specularMaterial(58, 40, 26);
-    shininess(6);
-    cylinder(9, 100);
-
-    push();
-    translate(0, -80, 0);
-    ambientMaterial(38, 92, 46);
-    specularMaterial(38, 92, 46);
-    shininess(5);
-    sphere(46);
-    pop();
-    push();
-    translate(18, -60, 10);
-    ambientMaterial(44, 104, 52);
-    specularMaterial(44, 104, 52);
-    shininess(5);
-    sphere(32);
-    pop();
-    push();
-    translate(-20, -55, -8);
-    ambientMaterial(34, 84, 42);
-    specularMaterial(34, 84, 42);
-    shininess(5);
-    sphere(30);
-    pop();
-
-    pop();
-
-    sombraEnPiso(x, 1030, 90, 45);
-  }
 }
  
 // Autos estacionados sobre el cordón: le dan vida a la calle y
@@ -1065,10 +940,8 @@ function dibujarArbolesCalle() {
 // low-poly, coherentes con el resto del juego.
 function dibujarAutosEstacionados() {
   const autos = [
-    { x: -950, colorAuto: [90, 90, 96]  },
     { x: -520, colorAuto: [150, 40, 40] },
     { x: 260,  colorAuto: [50, 70, 130] },
-    { x: 550,  colorAuto: [150, 140, 50] },
     { x: 900,  colorAuto: [70, 70, 74] }
   ];
  
@@ -1127,79 +1000,10 @@ function dibujarAutosEstacionados() {
   }
 }
  
-// Basura tirada en la vereda: aparece de a poco a medida que crece
-// factorDegradacion() (deuda/camino/clausura). Posiciones y colores
-// fijos a propósito -- nada de Math.random() en el draw loop, para
-// que no titile.
-const BASURA_CALLE = [
-  { x: 760,  z: 300, color: [64, 60, 52] },
-  { x: -820, z: 480, color: [70, 66, 40] },
-  { x: 500,  z: 560, color: [50, 52, 56] },
-  { x: -300, z: 500, color: [72, 40, 36] },
-  { x: 940,  z: 420, color: [60, 58, 54] }
-];
-
-function dibujarBasuraCalle() {
-  const d = factorDegradacion();
-  if (d < 0.3) return;
-
-  const cuantas = d > 0.7 ? BASURA_CALLE.length : (d > 0.5 ? 4 : 2);
-
-  push();
-  noStroke();
-  for (let i = 0; i < cuantas; i++) {
-    const item = BASURA_CALLE[i];
-    push();
-    translate(item.x, 214, item.z);
-    rotateY(i * 47);
-    fill(...item.color, 230);
-    box(16, 7, 11);
-    pop();
-    sombraEnPiso(item.x, item.z, 24, 30);
-  }
-  pop();
-}
-
-// Macetas junto a la puerta: un toque de prosperidad cuando el
-// kiosco viene progresando bien (metasAlcanzadas, ver interfaz.js).
-// Aparecen a partir de la 3ra meta ("Media fianza" / cartel luminoso).
-function dibujarMacetas() {
-  if (typeof metasAlcanzadas === 'undefined' || metasAlcanzadas < 3) return;
-
-  const hojas = [[0, 0, 22], [10, 8, 16], [-9, 9, 16], [6, -10, 14], [-6, -8, 13]];
-
-  for (const [x, z] of [[720, 340], [1030, 340]]) {
-    push();
-    translate(x, 195, z);
-    ambientMaterial(150, 90, 60);
-    specularMaterial(150, 90, 60);
-    shininess(10);
-    cylinder(20, 30);
-    pop();
-
-    for (const [dx, dz, s] of hojas) {
-      push();
-      translate(x + dx, 165, z + dz);
-      ambientMaterial(42, 112, 56);
-      specularMaterial(42, 112, 56);
-      shininess(8);
-      sphere(s);
-      pop();
-    }
-
-    sombraEnPiso(x, z, 50, 40);
-  }
-}
-
 function dibujarFarol(x, z) {
-  // De día el farol está apagado (o casi): la intensidad de la
-  // franja horaria escala el brillo del vidrio y su halo.
-  const intensidad = intensidadLucesArtificiales();
-  const luz = PALETA_CALLE.farolLuz.map(c => c * (0.15 + intensidad * 0.85));
-
   push();
   translate(x, 0, z);
-
+ 
   push();
   translate(0, 60, 0);
   ambientMaterial(48, 48, 50);
@@ -1207,7 +1011,7 @@ function dibujarFarol(x, z) {
   shininess(20);
   cylinder(6, 320);
   pop();
-
+ 
   push();
   translate(20, -100, 0);
   rotateZ(90);
@@ -1216,29 +1020,27 @@ function dibujarFarol(x, z) {
   shininess(20);
   cylinder(4, 50);
   pop();
-
+ 
   // El vidrio del farol: emissive, para que se vea "prendido" de
   // verdad y no dependa de que la luz de la escena le pegue bien.
   push();
   translate(44, -100, 0);
-  emissiveMaterial(...luz);
-  sphere(14, 20, 16);
+  emissiveMaterial(...PALETA_CALLE.farolLuz);
+  sphere(14);
   pop();
-
+ 
   // Halo suave alrededor del foco: una esfera translúcida más
-  // grande, con más detalle para que el resplandor salga redondo
-  // y no facetado.
+  // grande, truco barato para simular resplandor sin post-proceso.
   push();
   translate(44, -100, 0);
   noStroke();
-  fill(...PALETA_CALLE.farolLuz, 35 * intensidad);
-  sphere(26, 20, 16);
+  fill(...PALETA_CALLE.farolLuz, 35);
+  sphere(26);
   pop();
-
+ 
   pop();
-
+ 
   sombraEnPiso(x, z, 40, 35);
-  reflejoLuzEnPiso(x, z, PALETA_CALLE.farolLuz, 90, 50);
 }
  
 function dibujarCableado() {
@@ -1284,11 +1086,10 @@ function dibujarClientes() {
 function dibujarClienteVecina(x, z) {
   const ropa = [96, 46, 92];
   const piel = [176, 130, 96];
-  const bob = -Math.abs(sin(frameCount * 0.5)) * 3;
-
+ 
   push();
-  translate(x, bob, z);
-
+  translate(x, 0, z);
+ 
   for (const dx of [-9, 9]) {
     push(); translate(dx, 195, 0); fill(30, 30, 34); cylinder(9, 66); pop();
   }
@@ -1318,10 +1119,9 @@ function dibujarClienteVecina(x, z) {
 function dibujarClientePibe(x, z) {
   const ropa = [40, 100, 82];
   const piel = [140, 96, 66];
-  const bob = -Math.abs(sin(frameCount * 0.8)) * 4;
-
+ 
   push();
-  translate(x, bob, z);
+  translate(x, 0, z);
   scale(0.88, 1.15, 0.88);   // alto y delgado
  
   for (const dx of [-8, 8]) {
@@ -1348,10 +1148,9 @@ function dibujarClientePibe(x, z) {
 function dibujarClienteSenor(x, z) {
   const ropa = [90, 78, 60];
   const piel = [188, 148, 112];
-  const bob = -Math.abs(sin(frameCount * 0.28)) * 1.8;
-
+ 
   push();
-  translate(x, bob, z);
+  translate(x, 0, z);
   scale(1.1, 0.88, 1.1);   // bajo y ancho
  
   for (const dx of [-10, 10]) {
@@ -1375,27 +1174,13 @@ function dibujarClienteSenor(x, z) {
   pop();
 }
  
-// Balanceo idle para los personajes de fondo que antes quedaban
-// congelados en su lugar (policía/abogado/capo): un leve cambio de
-// peso, no una animación de caminata. La fase depende de x/z para
-// que los tres no se muevan sincronizados.
-function balanceoIdle(x, z) {
-  const fase = x * 0.7 + z * 0.3;
-  return {
-    y: sin(frameCount * 1.4 + fase) * 2.2,
-    rotY: sin(frameCount * 0.55 + fase) * 3
-  };
-}
-
 function dibujarPolicia(x, z) {
   const uniforme = [34, 46, 84];
   const piel = [168, 122, 90];
-  const balanceo = balanceoIdle(x, z);
-
+ 
   push();
-  translate(x, balanceo.y, z);
-  rotateY(balanceo.rotY);
-
+  translate(x, 0, z);
+ 
   for (const dx of [-9, 9]) {
     push(); translate(dx, 195, 0); fill(24, 26, 30); cylinder(9, 70); pop();
   }
@@ -1414,13 +1199,11 @@ function dibujarPolicia(x, z) {
 function dibujarAbogado(x, z) {
   const traje = [26, 32, 58];
   const piel = [186, 140, 104];
-  const balanceo = balanceoIdle(x, z);
-
+ 
   push();
-  translate(x, balanceo.y, z);
-  rotateY(balanceo.rotY);
+  translate(x, 0, z);
   scale(0.85, 1.12, 0.85);   // alto y formal
-
+ 
   for (const dx of [-8, 8]) {
     push(); translate(dx, 195, 0); fill(...traje); cylinder(7, 70); pop();
     push(); translate(dx, 232, 6); fill(15, 14, 14); box(14, 8, 24); pop();
@@ -1442,13 +1225,11 @@ function dibujarAbogado(x, z) {
 function dibujarCapo(x, z) {
   const campera = [64, 22, 22];
   const piel = [158, 108, 76];
-  const balanceo = balanceoIdle(x, z);
-
+ 
   push();
-  translate(x, balanceo.y, z);
-  rotateY(balanceo.rotY);
+  translate(x, 0, z);
   scale(1.35, 0.95, 1.35);   // macizo, imponente
-
+ 
   for (const dx of [-13, 13]) {
     push(); translate(dx, 195, 0); fill(18, 16, 16); cylinder(13, 70); pop();
   }
@@ -1486,8 +1267,7 @@ function dibujarEscena() {
   dibujarEstantePrincipal();
   dibujarMostrador();
   dibujarPuertaSalida();
-  dibujarMacetas();
-
+ 
   // --- La calle ---
   dibujarCalle();
   dibujarFachadasCalle();
@@ -1495,70 +1275,41 @@ function dibujarEscena() {
   dibujarFarol(0, 540);
   dibujarFarol(700, 540);
   dibujarCableado();
-  dibujarGuirnaldaFestejo();
-  dibujarBasuraCalle();
-
+ 
   // --- Los NPCs (con sombra debajo para que no floten) ---
   dibujarClientes();
   dibujarPolicia(-600, 470);
   dibujarAbogado(600, 480);
   dibujarCapo(200, 490);
-
+ 
   sombraEnPiso(-600, 470, 90);
   sombraEnPiso(600, 480, 85);
   sombraEnPiso(200, 490, 120);
-
-  // --- La niebla va casi última: se superpone a todo lo lejano ---
+ 
+  // --- La niebla va última: se superpone a todo lo lejano ---
   dibujarNiebla();
-
-  // --- El clima (lluvia de nieve/vaho/confeti) va sobre todo lo
-  //     demás para que se vea nítido en primer plano ---
-  dibujarClima();
 }
  
 // ==========================================================
-// AMBIENTACIÓN SEGÚN DEUDA Y CAMINO (task 6/15)
-// No hay geometría nueva: el local "se degrada" solo con luz más
-// apagada y grisácea, reusando aplicarIluminacion de más abajo.
-// Combina deuda arrastrada, semana de castigo (capo/policía
-// escalando) y clausura -- cuantas más se acumulen, más pesado
-// se siente el ambiente.
-// ==========================================================
-function factorDegradacion() {
-  let d = 0;
-  if (gameState.deudaAcumulada > 0) d += 0.25;
-  if (typeof enSemanaCastigo === 'function' && enSemanaCastigo()) d += 0.35;
-  if (caminos.clausurado > 0) d += 0.4;
-  return Math.min(1, d);
-}
-
-// ==========================================================
 // ILUMINACIÓN
-// Cambia según el estrés, la degradación (deuda/camino) y si hay
-// corte de luz.
+// Cambia según el estrés y si hay corte de luz.
 // ==========================================================
 function aplicarIluminacion() {
   const e = gameState.estres / 100;
-  const d = factorDegradacion();
-  const factorLuz = efectosDia.sinLuz ? 0.22 : (1 - d * 0.18);
-  // Empuje extra de luz natural según la franja horaria (mañana y
-  // sobre todo mediodía suman brillo; de noche queda en 0, como
-  // estaba tuneado originalmente).
-  const brillo = FRANJA_BRILLO[franjaEscenaActual()] || 0;
-
-  // --- Luz ambiente: a más estrés, más rojiza y opresiva; a más
-  //     degradación, más apagada y grisácea; con más luz de día ---
+  const factorLuz = efectosDia.sinLuz ? 0.22 : 1;
+ 
+  // --- Luz ambiente: a más estrés, más rojiza y opresiva ---
   ambientLight(
-    (62 + e * 34 - d * 14 + brillo) * factorLuz,
-    (58 - e * 22 - d * 10 + brillo) * factorLuz,
-    (54 - e * 24 - d * 6 + brillo * 0.85) * factorLuz
+    (62 + e * 34) * factorLuz,
+    (58 - e * 22) * factorLuz,
+    (54 - e * 24) * factorLuz
   );
-
+ 
   // --- Luz direccional principal ---
   directionalLight(
-    (118 + e * 28 - d * 20 + brillo) * factorLuz,
-    (112 - e * 26 - d * 14 + brillo) * factorLuz,
-    (102 - e * 28 - d * 10 + brillo * 0.85) * factorLuz,
+    (118 + e * 28) * factorLuz,
+    (112 - e * 26) * factorLuz,
+    (102 - e * 28) * factorLuz,
     0.3, 1, -0.4
   );
  
@@ -1609,55 +1360,23 @@ function aplicarIluminacion() {
 // que dan sensación de profundidad sin costo de rendimiento.
 // ==========================================================
  
-// ==========================================================
-// CICLO DE FRANJA HORARIA (task del pedido "mejorá los gráficos")
-// franjaHoraria() ya existía (ventas.js, ronda 2) para sesgar qué
-// productos piden los clientes. Acá se reusa lo mismo para que el
-// cielo, la luz ambiente y las luces de la calle cambien de tono
-// según la hora del día en vez de ser siempre de noche.
-// ==========================================================
-const CIELO_FRANJA = {
-  mañana:   { arriba: [92, 122, 168],  abajo: [235, 202, 168] },
-  mediodia: { arriba: [88, 140, 200],  abajo: [206, 214, 216] },
-  tarde:    { arriba: [64, 52, 104],   abajo: [235, 132, 70]  },
-  noche:    { arriba: [16, 14, 36],    abajo: [102, 64, 30]   }
-};
-
-// Cuánta luz artificial (faroles, ventanas) corresponde a cada
-// franja: de noche a pleno, casi apagada al mediodía.
-const FRANJA_INTENSIDAD_LUCES = { mañana: 0.3, mediodia: 0.08, tarde: 0.65, noche: 1 };
-
-// Empuje extra de brillo ambiente/direccional por franja, para que
-// el mediodía se sienta más luminoso sin desarmar el tuneo nocturno
-// original (que se deja en 0, tal como estaba).
-const FRANJA_BRILLO = { mañana: 10, mediodia: 26, tarde: 4, noche: 0 };
-
-function franjaEscenaActual() {
-  return (typeof franjaHoraria === 'function') ? franjaHoraria() : 'noche';
-}
-
-function intensidadLucesArtificiales() {
-  return FRANJA_INTENSIDAD_LUCES[franjaEscenaActual()] ?? 1;
-}
-
-// Cielo con degradé, dibujado como planos apilados bien lejos,
-// detrás de todo. El color cambia según la franja horaria.
+// Cielo nocturno con degradé, dibujado como planos apilados
+// bien lejos, detrás de todo.
 function dibujarCielo() {
-  const grad = CIELO_FRANJA[franjaEscenaActual()] || CIELO_FRANJA.noche;
-
   push();
   noStroke();
   translate(0, -120, -900);
-
+ 
   const franjas = 16;
   const altoFranja = 1100 / franjas;
-
+ 
   for (let i = 0; i < franjas; i++) {
     const t = i / (franjas - 1);
-    const r = lerp(grad.arriba[0], grad.abajo[0], t);
-    const g = lerp(grad.arriba[1], grad.abajo[1], t);
-    const b = lerp(grad.arriba[2], grad.abajo[2], t);
-
+    // De azul noche arriba a naranja de contaminación lumínica abajo
+    const r = 16 + t * 86;
+    const g = 14 + t * 50;
+    const b = 36 - t * 6;
+ 
     push();
     translate(0, -550 + altoFranja * i + altoFranja / 2, 0);
     fill(r, g, b);
@@ -1665,22 +1384,6 @@ function dibujarCielo() {
     pop();
   }
   pop();
-
-  // Ola de calor (task clima visual): un sol fuerte y alto, con un
-  // halo suave alrededor -- el mismo truco barato de "esfera
-  // translúcida" que ya se usa en los faroles para simular resplandor.
-  if (typeof climaHoy !== 'undefined' && climaHoy.tipo === 'calor') {
-    push();
-    translate(320, -680, -880);
-    emissiveMaterial(255, 236, 182);
-    sphere(46, 24, 18);
-    noStroke();
-    fill(255, 224, 150, 45);
-    sphere(85, 24, 18);
-    fill(255, 224, 150, 22);
-    sphere(130, 24, 18);
-    pop();
-  }
 }
  
 // Capas semitransparentes que se van poniendo más densas con
@@ -1688,160 +1391,24 @@ function dibujarCielo() {
 function dibujarNiebla() {
   push();
   noStroke();
-
+ 
   const capas = [
     { z: 1320, alpha: 32 },
     { z: 1050, alpha: 24 },
     { z: 820,  alpha: 15 },
     { z: 640,  alpha: 8  }
   ];
-
-  // De día la niebla se aclara y se vuelve más gris que violeta,
-  // como aire real y no bruma nocturna.
-  const franja = franjaEscenaActual();
-  const colorNiebla = (franja === 'mediodia' || franja === 'mañana')
-    ? [190, 192, 196]
-    : [78, 76, 92];
-
+ 
   for (const capa of capas) {
     push();
     translate(0, 40, capa.z);
-    fill(...colorNiebla, capa.alpha);
+    fill(78, 76, 92, capa.alpha);
     plane(3000, 900);
     pop();
   }
   pop();
 }
  
-// ==========================================================
-// CLIMA VISUAL (task "mejorá los gráficos")
-// climaHoy.tipo ya existía (ronda 2) y afectaba solo las ventas.
-// Acá se le suma una capa visual: partículas simples que se
-// regeneran solas cuando cambia el tipo de clima del día.
-// ==========================================================
-let particulasClima = [];
-let _climaParticulasTipo = undefined; // distinto de null/'', para forzar la primera generación
-
-function regenerarParticulasClimaSiHaceFalta() {
-  const tipo = (typeof climaHoy !== 'undefined') ? climaHoy.tipo : null;
-  if (tipo === _climaParticulasTipo) return;
-
-  _climaParticulasTipo = tipo;
-  particulasClima = [];
-
-  if (tipo === 'frio') {
-    for (let i = 0; i < 90; i++) {
-      particulasClima.push({
-        x: -1200 + Math.random() * 2400,
-        y: -600 + Math.random() * 800,
-        z: -150 + Math.random() * 1000,
-        vy: 0.7 + Math.random() * 1.1,
-        fase: Math.random() * 1000,
-        tam: 2.5 + Math.random() * 3
-      });
-    }
-  } else if (tipo === 'calor') {
-    for (let i = 0; i < 45; i++) {
-      particulasClima.push({
-        x: -900 + Math.random() * 1800,
-        y: -50 + Math.random() * 260,
-        z: 150 + Math.random() * 700,
-        vy: -(0.3 + Math.random() * 0.5),
-        fase: Math.random() * 1000,
-        tam: 2 + Math.random() * 2.5
-      });
-    }
-  } else if (tipo === 'festejo') {
-    const coloresConfeti = [[230, 60, 70], [240, 200, 40], [60, 160, 220], [90, 200, 110], [230, 230, 230]];
-    for (let i = 0; i < 70; i++) {
-      particulasClima.push({
-        x: -1000 + Math.random() * 2000,
-        y: -650 + Math.random() * 500,
-        z: -100 + Math.random() * 900,
-        vy: 0.6 + Math.random() * 0.9,
-        fase: Math.random() * 1000,
-        tam: 5 + Math.random() * 4,
-        color: coloresConfeti[i % coloresConfeti.length]
-      });
-    }
-  }
-}
-
-function dibujarClima() {
-  regenerarParticulasClimaSiHaceFalta();
-  if (particulasClima.length === 0) return;
-
-  push();
-  noStroke();
-
-  if (_climaParticulasTipo === 'frio') {
-    fill(240, 244, 250, 215);
-    for (const p of particulasClima) {
-      p.y += p.vy;
-      const deriva = sin((frameCount + p.fase) * 1.2) * 6;
-      if (p.y > 220) { p.y = -600; }
-      push();
-      translate(p.x + deriva, p.y, p.z);
-      sphere(p.tam);
-      pop();
-    }
-  } else if (_climaParticulasTipo === 'calor') {
-    // Motas de calor subiendo despacio, como vaho sobre el asfalto
-    fill(255, 224, 170, 60);
-    for (const p of particulasClima) {
-      p.y += p.vy;
-      const deriva = sin((frameCount + p.fase) * 0.8) * 4;
-      if (p.y < -320) { p.y = 220; }
-      push();
-      translate(p.x + deriva, p.y, p.z);
-      sphere(p.tam);
-      pop();
-    }
-  } else if (_climaParticulasTipo === 'festejo') {
-    for (const p of particulasClima) {
-      p.y += p.vy;
-      const giro = (frameCount + p.fase) * 4;
-      const deriva = sin((frameCount + p.fase) * 1.5) * 10;
-      if (p.y > 220) { p.y = -650; }
-      push();
-      translate(p.x + deriva, p.y, p.z);
-      rotateZ(giro);
-      rotateX(giro * 0.6);
-      fill(...p.color, 230);
-      plane(p.tam, p.tam);
-      pop();
-    }
-  }
-
-  pop();
-}
-
-// Guirnalda de luces de colores sobre el cableado de la calle,
-// solo el día de festejo del barrio -- reusa la curva de
-// dibujarCableado (task "mejorá los gráficos").
-function dibujarGuirnaldaFestejo() {
-  if (typeof climaHoy === 'undefined' || climaHoy.tipo !== 'festejo') return;
-
-  const coloresLuces = [[230, 60, 70], [240, 200, 40], [60, 160, 220], [90, 200, 110]];
-  const y = -140;
-  push();
-  noStroke();
-  for (let i = 0; i <= 20; i++) {
-    const t = i / 20;
-    const x = -700 + t * 1400;
-    // Sigue aproximadamente la curva del cable (misma caída que dibujarCableado)
-    const caida = 14 + Math.sin(t * PI) * 26;
-    const c = coloresLuces[i % coloresLuces.length];
-    const parpadeo = 0.7 + sin(frameCount * 2 + i * 1.7) * 0.3;
-    push();
-    translate(x, y + caida, 540);
-    emissiveMaterial(c[0] * parpadeo, c[1] * parpadeo, c[2] * parpadeo);
-    sphere(5);
-    pop();
-  }
-  pop();
-}
-
 // Sombra suave debajo de un objeto: un disco oscuro sobre el piso.
 // No es una sombra real (calcularlas es caro), pero ancla
 // visualmente los objetos y evita que parezcan flotando.
@@ -1852,22 +1419,5 @@ function sombraEnPiso(x, z, tam, opacidad = 60) {
   noStroke();
   fill(0, 0, 0, opacidad);
   ellipse(0, 0, tam, tam * 0.7);
-  pop();
-}
-
-// Charco de luz de color sobre el piso, debajo de una fuente de luz
-// (farol, cartel): simula piso húmedo reflejando la luz de noche sin
-// necesitar un reflejo 3D real. Se apaga solo de día (misma
-// intensidad que las luces artificiales que refleja).
-function reflejoLuzEnPiso(x, z, color, tam, opacidad = 55) {
-  const intensidad = intensidadLucesArtificiales();
-  if (intensidad < 0.05) return;
-
-  push();
-  translate(x, 218.3, z + tam * 0.25);
-  rotateX(90);
-  noStroke();
-  fill(color[0], color[1], color[2], opacidad * intensidad);
-  ellipse(0, 0, tam, tam * 1.7);
   pop();
 }
