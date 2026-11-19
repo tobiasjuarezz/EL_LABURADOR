@@ -30,9 +30,11 @@ function setup() {
   cnv.parent('canvasWrapper');
 
   angleMode(DEGREES);      // trabajar en grados, no en radianes
+  ajustarPerspectiva();    // que no se "corte" lo que está cerca de la cámara
 
   generarColoresClutter(); // colores fijos de la mercadería
   generarTexturas();       // texturas procedurales (madera, pared, piso)
+  cargarModelos3D();       // modelos de Blender (llegan solos, sin trabar el arranque)
   actualizarHUD();
 
   audioListoInicializar(); // deja música y sonidos de pasos configurados
@@ -65,4 +67,14 @@ function draw() {
 function windowResized() {
   const { w, h } = obtenerDimensiones();
   resizeCanvas(w, h);
+  ajustarPerspectiva();    // resizeCanvas vuelve la perspectiva a la de fábrica
+}
+
+// Por defecto p5 no dibuja nada que esté a menos de 80 unidades de
+// la cámara (el "plano cercano"). Parado en el mostrador, la reja de
+// la ventanita queda más cerca que eso y desaparecía. Se mantiene el
+// mismo ángulo de visión de siempre y solo se acerca ese plano a 5.
+function ajustarPerspectiva() {
+  const fovy = 2 * atan(height / 2 / 800);
+  perspective(fovy, width / height, 5, 8000);
 }

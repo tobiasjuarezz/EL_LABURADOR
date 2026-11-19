@@ -406,6 +406,10 @@ function dibujarCartelTienda(zFachada) {
  
 // La reja se calcula: se divide el ancho por la separación deseada
 function dibujarRejas(zFachada) {
+  // Si ya cargó la reja de Blender, se dibuja al final de la escena
+  // (ver dibujarRejaKiosco3D en calle3d.js)
+  if (rejaKioscoLista()) return;
+
   const anchoVentana  = 900;
   const alturaVentana = 400;
   const separacion    = 26;
@@ -527,6 +531,8 @@ function dibujarCajaRegistradora() {
   pop();
 }
  
+const PRODUCTOS_ESTANTE_LATERAL = ['papas', 'jugo', 'chicles', 'palitos', 'alfajor', 'chocolate'];
+
 function dibujarEstanteLateral(x, z) {
   const niveles      = 4;
   const altoNivel    = 55;
@@ -548,6 +554,22 @@ function dibujarEstanteLateral(x, z) {
     pop();
  
     const items = 6;
+
+    // Con los modelos de Blender cargados, el estante se llena con
+    // productos de verdad (los que entran de alto en cada nivel).
+    if (PRODUCTOS_ESTANTE_LATERAL.every(modeloListo)) {
+      for (let i = 0; i < items; i++) {
+        const id = PRODUCTOS_ESTANTE_LATERAL[(n * 2 + i) % PRODUCTOS_ESTANTE_LATERAL.length];
+        push();
+        translate(-8 + (i % 2) * 14, y - 3, -profEstante / 2 + 24 + i * (profEstante / items));
+        rotateY(x < 0 ? 90 : -90);   // que miren hacia el centro del local
+        scale(0.82);
+        dibujarModelo(id);
+        pop();
+      }
+      continue;
+    }
+
     for (let i = 0; i < items; i++) {
       const idx = (n * items + i) % coloresClutter.length;
       const alto = 30 + (idx % 3) * 8;
@@ -591,6 +613,34 @@ function dibujarEstanteLateral(x, z) {
 }
  
 function dibujarHeladera(x, z) {
+  // --- Versión 3D de Blender (si ya cargó) ---
+  if (modeloListo('heladera') && modeloListo('heladera_luz')) {
+    push();
+    translate(x, 220, z);          // el modelo arranca en el piso (y=220)
+    dibujarModelo('heladera');     // gabinete: lo iluminan las luces del local
+
+    // El interior tiene su propia luz (tubos LED horneados en Blender).
+    // Con corte de luz se dibuja con las luces de la escena y queda oscuro.
+    if (efectosDia.sinLuz) dibujarModelo('heladera_luz');
+    else dibujarModeloConLuzPropia('heladera_luz');
+
+    // Vidrio de la puerta: casi transparente, con un brillo suave.
+    // Va al final para que se vea lo de adentro a través de él.
+    push();
+    translate(0, -151, 37);
+    noStroke();
+    specularMaterial(255);
+    shininess(90);
+    fill(190, 220, 240, 26);
+    box(84, 246, 1);
+    pop();
+
+    pop();
+    sombraEnPiso(x, z, 100, 65);
+    return;
+  }
+
+  // --- Versión vieja (mientras carga el modelo, o si falla) ---
   push();
   translate(x, 40, z);
  
@@ -650,7 +700,22 @@ function dibujarEstantePrincipal() {
   const productos = gameState.productos;
   const espacio = 120;
   const inicioX = -((productos.length - 1) * espacio) / 2;
- 
+
+  // --- Versión 3D de Blender ---
+  if (modeloListo('gondola') && modeloListo('gondola_deco')) {
+    push();
+    translate(0, 210, -287);        // abajo del tablero, en su cara del frente
+    dibujarModelo('gondola');       // machimbre, estante y panel perforado
+    dibujarModelo('gondola_deco');  // golosinas colgadas, cartel y reloj
+    pop();
+
+    for (let i = 0; i < productos.length; i++) {
+      dibujarCasilleroProducto(productos[i], inicioX + i * espacio);
+    }
+    return;
+  }
+
+  // --- Versión vieja ---
   push();
   translate(0, 0, -260);
  
@@ -718,6 +783,57 @@ function dibujarEstantePrincipal() {
   pop();
 }
  
+// Un casillero de la góndola 3D: muestra hasta 6 unidades del
+// producto según el STOCK REAL. Si el modelo de ese producto
+// todavía no cargó, usa la caja de color de antes.
+function dibujarCasilleroProducto(p, x) {
+  const yEstante = 201;   // superficie del estante
+  const zCentro  = -245;  // centro del casillero (de adelante hacia atrás)
+
+  push();
+  translate(x, yEstante, zCentro);
+
+  if (p.stock <= 0) {
+    // Sin stock: casillero vacío con marca roja
+    push();
+    translate(0, -2, 0);
+    fill(60, 30, 28);
+    box(70, 4, 60);
+    pop();
+    push();
+    translate(0, -6, 34);
+    fill(180, 55, 48);
+    box(40, 10, 2);
+    pop();
+    pop();
+    return;
+  }
+
+  const unidades = Math.min(6, p.stock);
+
+  for (let u = 0; u < unidades; u++) {
+    // Se dibujan de atrás hacia adelante (de la última a la primera)
+    // así las de adelante quedan bien encima de las de atrás.
+    const k = unidades - 1 - u;
+    const a = acomodoProducto(p.id, k);
+    push();
+    translate(a.x, a.y, a.z);
+    rotateY(a.giro);
+    rotateX(a.inclina);
+    if (modeloListo(p.id)) {
+      dibujarModelo(p.id);
+    } else {
+      const c = COLOR_PRODUCTO[p.id] || [196, 132, 44];
+      translate(0, -9, 0);
+      fill(...c);
+      box(30, 18, 30);
+    }
+    pop();
+  }
+
+  pop();
+}
+
 function dibujarPuertaSalida() {
   const x = 880;
  
@@ -1067,6 +1183,13 @@ function dibujarCableado() {
 // ==========================================================
  
 function dibujarClientes() {
+  // Con los modelos de Blender cargados, la vereda se llena de gente
+  // del barrio (ver personas.js). Si no, quedan los muñecos de antes.
+  if (personaLista('marian')) {
+    dibujarGenteDelBarrio();
+    return;
+  }
+
   const t = frameCount;
  
   // frameCount avanza solo; el módulo (%) hace que al llegar
@@ -1175,6 +1298,12 @@ function dibujarClienteSenor(x, z) {
 }
  
 function dibujarPolicia(x, z) {
+  // Versión 3D de Blender: parado en la vereda mirando el kiosco
+  if (personaLista('policia')) {
+    dibujarPersona('policia', x, z, 180, 'quieto', 0, 210);
+    return;
+  }
+
   const uniforme = [34, 46, 84];
   const piel = [168, 122, 90];
  
@@ -1197,6 +1326,12 @@ function dibujarPolicia(x, z) {
 }
  
 function dibujarAbogado(x, z) {
+  // Versión 3D de Blender: parado en la vereda mirando el kiosco
+  if (personaLista('abogado')) {
+    dibujarPersona('abogado', x, z, 180, 'quieto', 0, 210);
+    return;
+  }
+
   const traje = [26, 32, 58];
   const piel = [186, 140, 104];
  
@@ -1223,6 +1358,12 @@ function dibujarAbogado(x, z) {
 }
  
 function dibujarCapo(x, z) {
+  // Versión 3D de Blender: parado en la vereda mirando el kiosco
+  if (personaLista('capo')) {
+    dibujarPersona('capo', x, z, 180, 'quieto', 0, 120);
+    return;
+  }
+
   const campera = [64, 22, 22];
   const piel = [158, 108, 76];
  
@@ -1250,8 +1391,12 @@ function dibujarCapo(x, z) {
 // La llama draw() en cada frame.
 // ==========================================================
 function dibujarEscena() {
+  // ¿Ya cargó la calle de la villa hecha en Blender?
+  const calle3D = calleLista();
+
   // --- Fondo y atmósfera (van primero, detrás de todo) ---
   dibujarCielo();
+  if (calle3D) dibujarCieloNoche();
  
   // --- El local ---
   dibujarPiso();
@@ -1269,12 +1414,16 @@ function dibujarEscena() {
   dibujarPuertaSalida();
  
   // --- La calle ---
-  dibujarCalle();
-  dibujarFachadasCalle();
-  dibujarFarol(-700, 540);
-  dibujarFarol(0, 540);
-  dibujarFarol(700, 540);
-  dibujarCableado();
+  if (calle3D) {
+    dibujarCalle3D();            // la villa de Blender (calle3d.js)
+  } else {
+    dibujarCalle();              // la calle vieja, mientras carga
+    dibujarFachadasCalle();
+    dibujarFarol(-700, 540);
+    dibujarFarol(0, 540);
+    dibujarFarol(700, 540);
+    dibujarCableado();
+  }
  
   // --- Los NPCs (con sombra debajo para que no floten) ---
   dibujarClientes();
@@ -1286,8 +1435,14 @@ function dibujarEscena() {
   sombraEnPiso(600, 480, 85);
   sombraEnPiso(200, 490, 120);
  
-  // --- La niebla va última: se superpone a todo lo lejano ---
+  // --- Alambrado del baldío (transparente: después de lo que está detrás) ---
+  if (calle3D) dibujarAlambradosCalle();
+
+  // --- La niebla: se superpone a todo lo lejano ---
   dibujarNiebla();
+
+  // --- La reja del kiosco va última de todo (también es transparente) ---
+  if (rejaKioscoLista()) dibujarRejaKiosco3D();
 }
  
 // ==========================================================
