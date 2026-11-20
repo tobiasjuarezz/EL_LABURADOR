@@ -84,7 +84,7 @@ function aplicarCamaraPrimeraPersona() {
 function mouseDragged() {
   if (!juegoIniciado) return true;
 
-  camAngulo += (mouseX - pmouseX) * 0.4;
+  camAngulo -= (mouseX - pmouseX) * 0.4;
   camPitch = constrain(camPitch - (mouseY - pmouseY) * 0.2, -35, 35);
   return false;   // evita que el arrastre scrollee la página
 }

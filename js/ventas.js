@@ -11,7 +11,7 @@ const BILLETES = [1000, 2000, 5000, 10000, 20000];
 
 function billeteQuePaga(total) {
   const posibles = BILLETES.filter(b => b >= total);
-  if (posibles.length === 0) return BILLETES[BILLETES.length - 1];
+  if (posibles.length === 0) return total;
   if (posibles.length > 1 && Math.random() < 0.35) return posibles[1];
   return posibles[0];
 }
@@ -168,13 +168,13 @@ function renderPedidoCliente() {
     </div>
     ${comentario}
     <div style="margin-top:12px; padding:10px 14px; background:rgba(61,124,181,0.12); border-radius:8px;">
-      Te paga con un billete de
+      Te paga con
       <strong style="color:#fff; font-size:17px;">$${paga.toLocaleString('es-AR')}</strong>.
       <br><span style="color:#F2A93B;">¿Cuánto vuelto le tenés que dar?</span>
     </div>
     <div style="display:flex; gap:8px; align-items:center; margin-top:12px;">
       <span style="color:#a8a094; font-size:15px;">Vuelto: $</span>
-      <input type="number" id="inputVuelto" placeholder="0">
+      <input type="number" id="inputVuelto" placeholder="0" min="0" max="${paga}" step="1">
     </div>
     <div id="feedbackVuelto" style="margin-top:10px; font-size:13px;"></div>`;
 
@@ -204,7 +204,8 @@ function renderPedidoCliente() {
 function verificarVuelto() {
   const inp = document.getElementById('inputVuelto');
   const feedback = document.getElementById('feedbackVuelto');
-  if (!inp || !clienteActual) return;
+  const cliente = clienteActual;
+  if (!inp || !cliente || cliente.resuelto) return;
 
   if (inp.value === '') {
     feedback.innerHTML = '<span style="color:#ff6b66;">Poné cuánto vuelto le vas a dar.</span>';
@@ -212,7 +213,14 @@ function verificarVuelto() {
   }
 
   const respuesta = Number(inp.value);
-  const correcto  = clienteActual.vuelto;
+  const { vuelto: correcto, paga } = cliente;
+
+  if (!Number.isSafeInteger(respuesta) || respuesta < 0 || respuesta > paga) {
+    feedback.innerHTML = `<span style="color:#ff6b66;">
+      Ingresá un monto entero entre $0 y $${paga.toLocaleString('es-AR')}.</span>`;
+    inp.focus();
+    return;
+  }
 
   if (respuesta === correcto) {
     cobrarVenta(0, null);
@@ -224,19 +232,28 @@ function verificarVuelto() {
   if (diferencia > 0) {
     feedback.innerHTML = `<span style="color:#ff6b66;">
       Le diste $${diferencia.toLocaleString('es-AR')} de más. Se va rápido, sin decir nada.</span>`;
-    setTimeout(() => cobrarVenta(diferencia, 'de_mas'), 900);
+    programarCobro(cliente, inp, diferencia, 'de_mas');
   } else {
     feedback.innerHTML = `<span style="color:#ff6b66;">
       "Che, me estás dando de menos. Fijate bien."</span>`;
     clienteActual.intentos++;
 
     if (clienteActual.intentos >= 2) {
-      setTimeout(() => cobrarVenta(0, 'reclamo'), 900);
+      programarCobro(cliente, inp, 0, 'reclamo');
     } else {
       inp.value = '';
       inp.focus();
     }
   }
+}
+
+function programarCobro(cliente, inp, perdidaExtra, tipoError) {
+  cliente.resuelto = true;
+  inp.disabled = true;
+  document.querySelectorAll('#dcBotones button').forEach(btn => { btn.disabled = true; });
+  setTimeout(() => {
+    if (clienteActual === cliente) cobrarVenta(perdidaExtra, tipoError);
+  }, 900);
 }
 
 // ---- Concreta la venta ----
